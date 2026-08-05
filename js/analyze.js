@@ -36,7 +36,12 @@ export const THRESHOLDS = {
   fuelMarginLow: 500
 };
 
-const bilingual = (he, en) => (getLang() === 'he' ? he : en);
+/**
+ * Store both languages; render-time code picks the right one.
+ * If we called getLang() here, the language would be frozen at creation time,
+ * and toggling the language later wouldn't update the findings.
+ */
+const bilingual = (he, en) => ({ he, en });
 
 function finding(severity, chapter, title, detail, extra = {}) {
   return { severity, chapter, title, detail, ...extra };

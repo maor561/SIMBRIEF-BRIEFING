@@ -123,6 +123,18 @@ export function meter({ label, value, max, units, warnBelow = 500, badBelow = 10
 
 /* ---------------------------------------------------------------- findings */
 
+/**
+ * Extract the right-language string from a bilingual finding field.
+ * Findings store both languages as { he: "...", en: "..." } so they update
+ * when the language is toggled at runtime.
+ */
+function getText(field) {
+  if (!field) return '';
+  if (typeof field === 'string') return field; // backward compat
+  // field is { he: "...", en: "..." }
+  return field[getLang()] || field.en || '';
+}
+
 export function findingsList(findings, { showChapter = false } = {}) {
   if (!findings.length) {
     return `<div class="empty-state good">${escapeHtml(t('sev.none'))}</div>`;
@@ -132,8 +144,8 @@ export function findingsList(findings, { showChapter = false } = {}) {
       (f) => `<button class="finding ${severityClass(f.severity)}" data-action="goto-finding" data-chapter="${f.chapter}" data-id="${f.id}">
         <span class="bar"></span>
         <span class="txt">
-          <span class="title">${escapeHtml(f.title)}</span>
-          <span class="detail">${escapeHtml(f.detail)}</span>
+          <span class="title">${escapeHtml(getText(f.title))}</span>
+          <span class="detail">${escapeHtml(getText(f.detail))}</span>
           ${showChapter ? `<span class="where">${escapeHtml(severityLabel(f.severity))} · ${escapeHtml(t(`nav.${f.chapter}`))}</span>` : ''}
         </span>
       </button>`
