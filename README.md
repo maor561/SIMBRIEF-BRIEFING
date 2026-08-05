@@ -75,6 +75,20 @@ Everything comes from the SimBrief OFP — there are no external weather or NOTA
 calls. `api/ofp.js` proxies `simbrief.com/api/xml.fetcher.php` because the browser
 cannot reach it directly (no CORS headers), and caches for 60 s.
 
+A numeric input is sent as `userid`, anything else as `username`.
+
+### The two sources disagree about "empty"
+
+The live JSON API returns absent fields as an **empty object** `{}`; the XML export
+writes an empty element, which converts to `""`. A typical OFP carries around 117 of
+them. `isBlank()` in `js/normalize.js` is the single place that knows what absent
+looks like — `str`, `num`, `flag` and `arr` all defer to it. Never call
+`String(value)` on an OFP field directly: it renders `[object Object]`, and
+`Boolean(...)` of that is `true`, which silently flips flags on.
+
+The live API also returns single-item nodes as objects where the XML forces arrays
+(one ATIS, one alternate). `arr()` normalises both.
+
 Set `SIMBRIEF_USERNAME` as an environment variable to provide a default; otherwise
 the username is entered in the app and stored in `localStorage` on the device.
 
