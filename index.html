@@ -39,6 +39,35 @@
   </div>
 </div>
 
+<script>
+// Runs before the module, so a failure that stops app.js from ever executing
+// still gets reported. Without this the setup screen just sits there looking
+// idle, which is indistinguishable from a broken button.
+(function () {
+  var box = document.getElementById('setup-error');
+  function report(message) {
+    if (!box) return;
+    box.hidden = false;
+    box.textContent = message;
+  }
+
+  window.addEventListener('error', function (event) {
+    var where = event.filename ? event.filename.split('/').pop() : 'script';
+    report('שגיאת טעינה / Load error\n' + where + ': ' + (event.message || 'unknown'));
+  }, true);
+
+  // If the module never signals that it booted, say so rather than hanging.
+  window.__briefingBooted = false;
+  setTimeout(function () {
+    if (!window.__briefingBooted) {
+      report(
+        'הקוד לא נטען. נסה רענון עם ניקוי מטמון, או בדוק חיבור.\n' +
+        'The app script did not start. Try a hard refresh.'
+      );
+    }
+  }, 6000);
+})();
+</script>
 <script type="module" src="js/app.js"></script>
 </body>
 </html>

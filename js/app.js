@@ -196,7 +196,12 @@ function goToChapter(id, findingId) {
 el.form.addEventListener('submit', (event) => {
   event.preventDefault();
   const username = el.username.value.trim();
-  if (username) load({ username });
+  if (!username) {
+    showError(t('setup.username'));
+    el.username.focus();
+    return;
+  }
+  load({ username });
 });
 
 el.demo.addEventListener('click', () => load({ demo: true }));
@@ -324,6 +329,28 @@ setInterval(() => {
 
 /* -------------------------------------------------------------------- boot */
 
+/**
+ * Surface anything that escapes a handler.
+ *
+ * Without this an unexpected failure leaves the setup screen sitting there
+ * looking idle, which is indistinguishable from a dead button. Better to say
+ * what broke than to swallow it.
+ */
+function reportFatal(source, detail) {
+  el.overlay.hidden = false;
+  el.app.hidden = true;
+  setLoading(false);
+  showError(`${t('err.generic')}\n\n${source}: ${detail}`);
+}
+
+addEventListener('error', (event) => {
+  reportFatal(event.filename ? event.filename.split('/').pop() : 'error', event.message || 'unknown error');
+});
+
+addEventListener('unhandledrejection', (event) => {
+  reportFatal('async', event.reason?.message || String(event.reason));
+});
+
 function applySetupLanguage() {
   applyDocumentLanguage();
   document.getElementById('setup-heading').textContent = t('setup.heading');
@@ -333,6 +360,9 @@ function applySetupLanguage() {
   el.demo.textContent = t('setup.demo');
   el.submit.textContent = t('setup.load');
 }
+
+// Tells the inline watchdog in index.html that the module graph loaded.
+window.__briefingBooted = true;
 
 applySetupLanguage();
 
