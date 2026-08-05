@@ -197,7 +197,7 @@ el.form.addEventListener('submit', (event) => {
   event.preventDefault();
   const username = el.username.value.trim();
   if (!username) {
-    showError(t('setup.username'));
+    showError(t('err.emptyUsername'));
     el.username.focus();
     return;
   }

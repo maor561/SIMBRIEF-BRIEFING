@@ -28,9 +28,12 @@
   <div class="setup">
     <h1 id="setup-heading">חיבור ל-SimBrief</h1>
     <p id="setup-explain">הזן את שם המשתמש או מספר הטייס שלך ב-SimBrief.</p>
-    <form id="setup-form" autocomplete="off">
+    <!-- novalidate: native `required` blocks the submit event outright, so the
+         app's own handler never runs and the button looks dead. We validate
+         and report in the app instead. -->
+    <form id="setup-form" autocomplete="off" novalidate>
       <label for="username" id="setup-label">שם משתמש / Pilot ID</label>
-      <input id="username" name="username" type="text" inputmode="latin" autocapitalize="none" spellcheck="false" required>
+      <input id="username" name="username" type="text" inputmode="latin" autocapitalize="none" spellcheck="false">
       <button class="btn" type="submit" id="setup-submit">טען תדריך</button>
     </form>
     <button class="btn ghost" type="button" id="setup-demo">הצג טיסת הדגמה</button>

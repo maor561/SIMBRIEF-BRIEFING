@@ -230,6 +230,7 @@ const STRINGS = {
 
     'err.title': 'לא ניתן לטעון את התדריך',
     'err.retry': 'נסה שוב',
+    'err.emptyUsername': 'הזן שם משתמש או מספר טייס מ-SimBrief כדי לטעון את התדריך.',
     'err.no_ofp': 'לא נמצאה תוכנית טיסה עבור המשתמש הזה. צור OFP ב-SimBrief ונסה שוב.',
     'err.timeout': 'SimBrief לא הגיב בזמן.',
     'err.generic': 'אירעה שגיאה בשליפת הנתונים.'
@@ -458,6 +459,7 @@ const STRINGS = {
 
     'err.title': 'Could not load the briefing',
     'err.retry': 'Try again',
+    'err.emptyUsername': 'Enter your SimBrief username or pilot ID to load the briefing.',
     'err.no_ofp': 'No flight plan found for that user. Create an OFP on SimBrief and try again.',
     'err.timeout': 'SimBrief did not respond in time.',
     'err.generic': 'Something went wrong fetching the data.'
