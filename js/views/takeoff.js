@@ -25,7 +25,8 @@ import {
   runwayTable,
   fixList,
   chapterHeading,
-  chapterFindings
+  chapterFindings,
+  joinParts
 } from '../ui.js';
 import { THRESHOLDS } from '../analyze.js';
 
@@ -46,7 +47,10 @@ export default function renderTakeoff({ model, findings }) {
   const others = tlr.runways.filter((r) => r !== planned);
 
   return `
-    ${chapterHeading(`${t('to.title')} · ${tlr.airport || airport?.icao || ''}`, `${t('common.runway')} ${tlr.plannedRunway || ''}`)}
+    ${chapterHeading(
+      joinParts([t('to.title'), tlr.airport || airport?.icao]),
+      joinParts([t('common.runway'), tlr.plannedRunway], ' ')
+    )}
 
     <div class="grid">
       ${findings.some((f) => f.chapter === 'takeoff') ? `<div class="col-12">${chapterFindings(findings, 'takeoff')}</div>` : ''}

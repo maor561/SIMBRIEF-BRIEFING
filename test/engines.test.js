@@ -11,7 +11,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
 
-import { normalizeOfp } from '../js/normalize.js';
+import { normalizeOfp, str, num, arr, flag } from '../js/normalize.js';
 import { analyze, SEVERITY, countByChapter } from '../js/analyze.js';
 import {
   parseMetar,
@@ -382,6 +382,55 @@ check('survives an OFP with missing optional sections', () => {
 
   const leanFindings = analyze(lean);
   assert.ok(Array.isArray(leanFindings), 'analyse still returns findings');
+});
+
+check('treats the live API empty-object as blank, not as text', () => {
+  // The XML export writes empty elements as ""; the live JSON API returns {}.
+  // Stringifying the latter used to render "[object Object]" across the UI.
+  assert.equal(str({}), null);
+  assert.equal(str(''), null);
+  assert.equal(num({}), null);
+  assert.equal(flag({}), false, 'an empty object is not a set flag');
+  assert.equal(flag('1'), true);
+  assert.equal(flag('0'), false);
+  assert.deepEqual(arr({}), [], 'an empty object is not a one-item list');
+  assert.deepEqual(arr([{}, { a: 1 }]), [{ a: 1 }], 'blank entries are dropped');
+  // Real values still survive.
+  assert.equal(str('DIPE2F'), 'DIPE2F');
+  assert.equal(num('320'), 320);
+});
+
+check('normalizes an OFP shaped like the live API response', () => {
+  const live = JSON.parse(JSON.stringify(raw));
+  // Reproduce how the live endpoint reports absent fields.
+  live.general.sid_ident = {};
+  live.general.star_ident = {};
+  live.origin.notam[0].notam_schedule = {};
+  live.origin.notam[0].date_expire_is_estimated = {};
+  live.origin.notam[0].notam_is_obstacle = {};
+  live.origin.atis = live.origin.atis[0]; // single item comes back as an object
+  live.alternate = live.alternate[0];
+
+  const m = normalizeOfp(live);
+  assert.equal(m.route.sid, null, 'absent SID is null, not "[object Object]"');
+  assert.equal(m.route.star, null);
+  assert.equal(m.origin.notams[0].schedule, null);
+  assert.equal(m.origin.notams[0].expiryEstimated, false, 'blank flag must not read as true');
+  assert.equal(m.origin.notams[0].isObstacle, false);
+  assert.equal(m.origin.atis.length, 1, 'a single ATIS object becomes a one-item list');
+  assert.equal(m.alternates.length, 1, 'a single alternate object becomes a one-item list');
+  assert.equal(m.alternates[0].icao, 'LCPH');
+
+  // Nothing anywhere in the model should stringify to [object Object].
+  const serialized = JSON.stringify(m.route) + JSON.stringify(m.flight) + JSON.stringify(m.origin.notams);
+  assert.equal(serialized.includes('[object'), false);
+});
+
+check('drops a phantom alternate when the OFP has none', () => {
+  const noAltn = JSON.parse(JSON.stringify(raw));
+  noAltn.alternate = {};
+  const m = normalizeOfp(noAltn);
+  assert.deepEqual(m.alternates, [], 'an empty alternate node must not become a card');
 });
 
 check('handles a runway with no V speeds', () => {

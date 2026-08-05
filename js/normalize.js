@@ -6,26 +6,43 @@
  * of that is dealt with here so no view has to.
  */
 
+/**
+ * True when SimBrief means "this field is empty".
+ *
+ * The two sources disagree: the XML export writes an empty element, which
+ * converts to "", while the live JSON API returns an empty object {}. Both mean
+ * absent, and stringifying the latter yields "[object Object]" in the UI.
+ */
+function isBlank(value) {
+  if (value === null || value === undefined) return true;
+  if (typeof value === 'object') return Object.keys(value).length === 0;
+  return String(value).trim() === '';
+}
+
 /** Numeric field -> number, or null when SimBrief left it blank. */
 export function num(value) {
-  if (value === null || value === undefined) return null;
-  const text = String(value).trim();
-  if (text === '') return null;
-  const parsed = Number(text);
+  if (isBlank(value) || typeof value === 'object') return null;
+  const parsed = Number(String(value).trim());
   return Number.isFinite(parsed) ? parsed : null;
 }
 
 /** Text field -> trimmed string, or null when blank. */
 export function str(value) {
-  if (value === null || value === undefined) return null;
-  const text = String(value).trim();
-  return text === '' ? null : text;
+  if (isBlank(value) || typeof value === 'object') return null;
+  return String(value).trim();
 }
 
-/** Anything -> array. Empty strings and missing nodes become []. */
+/** Truthy flag -> boolean. Blank and empty-object values are false. */
+export function flag(value) {
+  if (isBlank(value)) return false;
+  const text = String(value).trim().toLowerCase();
+  return text === '1' || text === 'true' || text === 'yes';
+}
+
+/** Anything -> array. Blank nodes and empty objects become []. */
 export function arr(value) {
-  if (Array.isArray(value)) return value;
-  if (value === null || value === undefined || value === '') return [];
+  if (Array.isArray(value)) return value.filter((item) => !isBlank(item));
+  if (isBlank(value)) return [];
   return [value];
 }
 
@@ -53,7 +70,7 @@ function normalizeNotam(entry) {
     locationType: str(entry.location_type),
     effective: str(entry.date_effective) || parseNotamDtg(entry.notam_effective_dtg),
     expires: str(entry.date_expire) || parseNotamDtg(entry.notam_expire_dtg_estimated),
-    expiryEstimated: Boolean(str(entry.date_expire_is_estimated)),
+    expiryEstimated: flag(entry.date_expire_is_estimated),
     created: str(entry.date_created),
     schedule: str(entry.notam_schedule),
     html: str(entry.notam_html),
@@ -65,7 +82,7 @@ function normalizeNotam(entry) {
     subject: str(entry.notam_qcode_subject),
     status: str(entry.notam_qcode_status),
     category: str(entry.notam_qcode_category),
-    isObstacle: str(entry.notam_is_obstacle) === '1'
+    isObstacle: flag(entry.notam_is_obstacle)
   };
 }
 
@@ -120,7 +137,7 @@ function normalizeFix(node, index) {
     type: str(node.type),
     stage: str(node.stage),
     via: str(node.via_airway),
-    isSidStar: str(node.is_sid_star) === '1',
+    isSidStar: flag(node.is_sid_star),
     lat: num(node.pos_lat),
     lon: num(node.pos_long),
     distance: num(node.distance),
@@ -284,7 +301,7 @@ export function normalizeOfp(raw) {
       aircraftIcao: str(raw.aircraft?.icao_code),
       registration: str(raw.aircraft?.reg),
       engines: str(raw.aircraft?.engines),
-      isEtops: str(general.is_etops) === '1',
+      isEtops: flag(general.is_etops),
       costIndex: num(general.costindex),
       climbProfile: str(general.climb_profile),
       cruiseProfile: str(general.cruise_profile),
@@ -316,7 +333,9 @@ export function normalizeOfp(raw) {
 
     origin: normalizeAirport(raw.origin, 'origin'),
     destination: normalizeAirport(raw.destination, 'destination'),
-    alternates: arr(raw.alternate).map((a) => normalizeAirport(a, 'alternate')).filter(Boolean),
+    alternates: arr(raw.alternate)
+      .map((a) => normalizeAirport(a, 'alternate'))
+      .filter((a) => a?.icao),
 
     navlog: fixes,
 

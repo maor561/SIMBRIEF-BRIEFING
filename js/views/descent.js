@@ -20,7 +20,8 @@ import {
   chapterHeading,
   chapterFindings,
   tafBlock,
-  metarBlock
+  metarBlock,
+  joinParts
 } from '../ui.js';
 
 export default function renderDescent({ model, findings }) {
@@ -28,7 +29,7 @@ export default function renderDescent({ model, findings }) {
   const eta = model.times.estOn || model.times.schedOn;
 
   return `
-    ${chapterHeading(t('des.title'), `${model.flight.descentProfile || ''} · ${model.route.star || ''}`)}
+    ${chapterHeading(t('des.title'), joinParts([model.flight.descentProfile, model.route.star]))}
 
     <div class="grid">
       ${findings.some((f) => f.chapter === 'descent') ? `<div class="col-12">${chapterFindings(findings, 'descent')}</div>` : ''}
@@ -42,7 +43,7 @@ export default function renderDescent({ model, findings }) {
       </div>
 
       <div class="col-7">
-        ${flushCard({ title: `${t('des.star')} — ${model.route.star || ''}`, body: starBody(model) })}
+        ${flushCard({ title: joinParts([t('des.star'), model.route.star], ' — '), body: starBody(model) })}
       </div>
 
       <div class="col-5">

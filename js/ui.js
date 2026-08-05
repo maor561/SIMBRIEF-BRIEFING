@@ -30,6 +30,15 @@ import { severityClass, severityLabel, SEVERITY } from './analyze.js';
 export const html = (strings, ...values) =>
   strings.reduce((out, chunk, i) => out + chunk + (values[i] ?? ''), '');
 
+/**
+ * Joins the parts that actually have a value.
+ * Plenty of OFP fields are optional (no SID, no STAR), and interpolating them
+ * straight into a heading leaves a dangling separator.
+ */
+export function joinParts(parts, separator = ' · ') {
+  return parts.filter((part) => part !== null && part !== undefined && String(part).trim() !== '').join(separator);
+}
+
 /* ------------------------------------------------------------------- cards */
 
 export function card({ title, hint, badge, body, cls = '', headless = false }) {

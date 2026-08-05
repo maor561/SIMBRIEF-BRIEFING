@@ -26,13 +26,14 @@ import {
   kv,
   chip,
   chapterHeading,
-  chapterFindings
+  chapterFindings,
+  joinParts
 } from '../ui.js';
 import { THRESHOLDS } from '../analyze.js';
 
 export default function renderCruise({ model, findings }) {
   return `
-    ${chapterHeading(t('crz.title'), `${model.flight.cruiseProfile || ''} · ${model.flight.cruiseMach || ''}`)}
+    ${chapterHeading(t('crz.title'), joinParts([model.flight.cruiseProfile, model.flight.cruiseMach]))}
 
     <div class="grid">
       ${findings.some((f) => f.chapter === 'cruise') ? `<div class="col-12">${chapterFindings(findings, 'cruise')}</div>` : ''}
