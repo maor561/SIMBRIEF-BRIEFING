@@ -302,6 +302,28 @@ check('flags high shear points on the route', () => {
   }
 });
 
+check('collapses widespread ISA deviation into one finding', () => {
+  // A warm route trips the threshold nearly everywhere; seven near-identical
+  // entries would bury the findings that actually need attention.
+  const warm = normalizeOfp(JSON.parse(JSON.stringify(raw)));
+  warm.navlog.forEach((f) => {
+    f.isaDev = 14;
+  });
+  const isaFindings = analyze(warm).filter((f) => /ISA|תקן|standard/i.test(f.title));
+  assert.equal(isaFindings.length, 1, 'one summary finding, not one per fix');
+  assert.match(isaFindings[0].detail, /32/, 'states how many fixes exceeded');
+
+  // An isolated pocket still gets named individually.
+  const spotty = normalizeOfp(JSON.parse(JSON.stringify(raw)));
+  spotty.navlog.forEach((f) => {
+    f.isaDev = 0;
+  });
+  spotty.navlog[5].isaDev = -16;
+  const spottyFindings = analyze(spotty).filter((f) => /ISA/i.test(f.title));
+  assert.equal(spottyFindings.length, 1);
+  assert.equal(spottyFindings[0].ident, spotty.navlog[5].ident);
+});
+
 check('records the tightest fuel margin on the model', () => {
   assert.ok(model.fuelTightest, 'expected a tightest fuel point');
   assert.ok(Number.isFinite(model.fuelTightest.margin));

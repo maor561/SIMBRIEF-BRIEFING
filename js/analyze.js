@@ -65,21 +65,9 @@ function checkRouteWeather(model, findings) {
       );
     }
 
-    if (Number.isFinite(fix.isaDev) && Math.abs(fix.isaDev) >= THRESHOLDS.isaDeviation) {
-      findings.push(
-        finding(
-          SEVERITY.WARNING,
-          'cruise',
-          bilingual(`סטיית ISA חריגה ב-${fix.ident}`, `Large ISA deviation at ${fix.ident}`),
-          bilingual(
-            `ISA ${fix.isaDev > 0 ? '+' : '−'}${Math.abs(fix.isaDev)}°C בגובה ${fmtFeet(fix.altitude)}. משפיע על ביצועי טיפוס ותקרה.`,
-            `ISA ${fix.isaDev > 0 ? '+' : '−'}${Math.abs(fix.isaDev)}°C at ${fmtFeet(fix.altitude)}. Affects climb performance and ceiling.`
-          ),
-          { fixIndex: fix.index, ident: fix.ident }
-        )
-      );
-    }
   }
+
+  reportIsaDeviation(fixes, findings);
 
   // Sharp changes in wind component between neighbouring fixes.
   for (let i = 1; i < fixes.length; i += 1) {
@@ -122,6 +110,60 @@ function checkRouteWeather(model, findings) {
       )
     );
   }
+}
+
+/**
+ * ISA deviation, reported once for the route rather than once per fix.
+ *
+ * A tropical or summer route sits above the threshold almost everywhere, and
+ * seven near-identical entries bury the findings that need attention. When the
+ * deviation is widespread it is a property of the route, so say it once and
+ * name the worst point; only genuinely isolated pockets get their own entry.
+ */
+function reportIsaDeviation(fixes, findings) {
+  const exceeded = fixes.filter(
+    (f) => Number.isFinite(f.isaDev) && Math.abs(f.isaDev) >= THRESHOLDS.isaDeviation
+  );
+  if (!exceeded.length) return;
+
+  const worst = exceeded.reduce((best, f) => (Math.abs(f.isaDev) > Math.abs(best.isaDev) ? f : best));
+  const sign = worst.isaDev > 0 ? '+' : '−';
+  const magnitude = Math.abs(worst.isaDev);
+
+  if (exceeded.length < 3) {
+    for (const fix of exceeded) {
+      const fixSign = fix.isaDev > 0 ? '+' : '−';
+      findings.push(
+        finding(
+          SEVERITY.WARNING,
+          'cruise',
+          bilingual(`סטיית ISA חריגה ב-${fix.ident}`, `Large ISA deviation at ${fix.ident}`),
+          bilingual(
+            `ISA ${fixSign}${Math.abs(fix.isaDev)}°C בגובה ${fmtFeet(fix.altitude)}. משפיע על ביצועי טיפוס ותקרה.`,
+            `ISA ${fixSign}${Math.abs(fix.isaDev)}°C at ${fmtFeet(fix.altitude)}. Affects climb performance and ceiling.`
+          ),
+          { fixIndex: fix.index, ident: fix.ident }
+        )
+      );
+    }
+    return;
+  }
+
+  findings.push(
+    finding(
+      SEVERITY.WARNING,
+      'cruise',
+      bilingual(
+        `אוויר ${worst.isaDev > 0 ? 'חם' : 'קר'} מהתקן לאורך רוב המסלול`,
+        `Air ${worst.isaDev > 0 ? 'warmer' : 'colder'} than standard along most of the route`
+      ),
+      bilingual(
+        `${exceeded.length} מתוך ${fixes.length} נקודות חורגות מ-${THRESHOLDS.isaDeviation}°C. השיא: ISA ${sign}${magnitude}°C ב-${worst.ident} בגובה ${fmtFeet(worst.altitude)}. משפיע על ביצועי טיפוס ועל התקרה הזמינה.`,
+        `${exceeded.length} of ${fixes.length} fixes exceed ${THRESHOLDS.isaDeviation}°C. Peak: ISA ${sign}${magnitude}°C at ${worst.ident}, ${fmtFeet(worst.altitude)}. Affects climb performance and available ceiling.`
+      ),
+      { fixIndex: worst.index, ident: worst.ident }
+    )
+  );
 }
 
 function checkAirportWeather(model, findings) {

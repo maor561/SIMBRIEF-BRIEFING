@@ -44,31 +44,31 @@ export default async function handler(req, res) {
       headers: { Accept: 'application/json' }
     });
 
-    if (!upstream.ok) {
-      return json(res, 502, {
-        error: 'simbrief_http_error',
-        message: `SimBrief responded with ${upstream.status}.`
-      });
-    }
-
     const body = await upstream.text();
 
-    let ofp;
+    // SimBrief reports an unknown user as HTTP 400 with a JSON body carrying
+    // the real reason, so parse before judging the status code -- otherwise a
+    // simple typo surfaces as an opaque upstream error.
+    let ofp = null;
     try {
       ofp = JSON.parse(body);
     } catch {
-      // SimBrief returns an XML/HTML error page for unknown users rather than JSON.
+      /* not JSON: fall through to the status check below */
+    }
+
+    const status = ofp?.fetch?.status;
+
+    if (status && !/success/i.test(status)) {
       return json(res, 404, {
         error: 'no_ofp',
-        message: `No OFP found for "${username}". Generate a flight plan on SimBrief first.`
+        message: `${status}. Check the username or generate a flight plan on SimBrief first.`
       });
     }
 
-    // SimBrief signals soft failures inside a 200 response.
-    if (ofp?.fetch?.status && !/success/i.test(ofp.fetch.status)) {
-      return json(res, 404, {
-        error: 'no_ofp',
-        message: ofp.fetch.status
+    if (!upstream.ok || !ofp) {
+      return json(res, 502, {
+        error: 'simbrief_http_error',
+        message: `SimBrief responded with ${upstream.status}.`
       });
     }
 
