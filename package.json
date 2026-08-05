@@ -1,0 +1,11 @@
+{
+  "name": "simbrief-briefing",
+  "version": "1.0.0",
+  "description": "Visual flight briefing generated from a SimBrief OFP, organised by flight phase",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "fixture": "node tools/xml2json.js \"C:/cluade/BOARDING PASS/simbrief_data.xml\" test/fixture.json",
+    "dev": "node tools/serve.js"
+  }
+}
