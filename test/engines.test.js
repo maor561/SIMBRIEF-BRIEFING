@@ -21,7 +21,8 @@ import {
   windComponents,
   notamSeverity,
   mentionsRunway,
-  notamActiveDuring
+  notamActiveDuring,
+  screenEnrouteNotam
 } from '../js/decode.js';
 
 const fixturePath = fileURLToPath(new URL('./fixture.json', import.meta.url));
@@ -231,6 +232,42 @@ check('matches runway designators, respecting the suffix letter', () => {
   assert.equal(mentionsRunway('ELEV 240FT', '24L'), false, 'not a runway reference');
   assert.equal(mentionsRunway('FREQ 124.5', '24L'), false);
   assert.equal(mentionsRunway('RWY 04/22 CLOSED DUE TO WIP', '04'), true);
+});
+
+check('screens enroute NOTAMs by Q-code subject', () => {
+  // Airspace and activity matter in the cruise; ground items do not.
+  assert.equal(screenEnrouteNotam({ qcode: 'QRTCA' }).keep, true, 'temporary restricted area');
+  assert.equal(screenEnrouteNotam({ qcode: 'QWMCA' }).keep, true, 'missile firing');
+  assert.equal(screenEnrouteNotam({ qcode: 'QOBCE' }).keep, false, 'obstacle');
+  assert.equal(screenEnrouteNotam({ qcode: 'QOLAS' }).keep, false, 'obstacle lighting');
+  assert.equal(screenEnrouteNotam({ qcode: 'QMXLC' }).keep, false, 'taxiway closed');
+  assert.equal(screenEnrouteNotam({ qcode: 'garbage' }).keep, false, 'unparseable code');
+});
+
+check('ranks live airspace above informational items', () => {
+  assert.equal(screenEnrouteNotam({ qcode: 'QRTCA' }).severity, 2, 'activated area');
+  assert.equal(screenEnrouteNotam({ qcode: 'QRDCA' }).severity, 2, 'danger area activated');
+  assert.equal(screenEnrouteNotam({ qcode: 'QAFXX' }).severity, 1, 'plain-language FIR note');
+});
+
+check('cuts the enroute list to a readable size', () => {
+  const routeFirs = new Set([...model.route.firs, ...model.navlog.map((f) => f.fir).filter(Boolean)]);
+  const kept = model.enrouteNotams
+    .filter((n) => !n.location || routeFirs.has(n.location))
+    .filter((n) => screenEnrouteNotam(n).keep);
+
+  assert.equal(model.enrouteNotams.length, 793, 'the raw list is large');
+  assert.ok(kept.length > 0, 'but not everything is removed');
+  assert.ok(kept.length < model.enrouteNotams.length * 0.6, `expected a real cut, kept ${kept.length}`);
+
+  // Only airspace, warning and ATM groups survive; aerodrome and obstacle
+  // items belong to the airport chapters.
+  const survivingGroups = new Set(kept.map((n) => (n.qcode || '')[1]));
+  assert.deepEqual([...survivingGroups].sort(), ['A', 'R', 'W']);
+
+  // At least some of what remains is live airspace, not just plain-language notes.
+  const live = kept.filter((n) => screenEnrouteNotam(n).severity === 2);
+  assert.ok(live.length > 0, 'expected some activated airspace on this route');
 });
 
 check('filters notams by the flight window', () => {

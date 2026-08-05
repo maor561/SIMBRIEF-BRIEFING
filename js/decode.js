@@ -481,6 +481,101 @@ export function mentionsRunway(text, runway) {
   return false;
 }
 
+/* ------------------------------------------------- enroute NOTAM screening */
+
+/**
+ * Enroute NOTAMs arrive from a different SimBrief node than the airport ones
+ * and carry only the raw ICAO Q-code, so subject and condition are decoded here.
+ *
+ * Q-code layout: Q + two letters of subject + two letters of condition.
+ */
+const QCODE_SUBJECTS = {
+  // Airspace and activity — what actually affects an aircraft in the cruise.
+  RP: { he: 'אזור אסור', en: 'Prohibited area', enroute: true },
+  RD: { he: 'אזור מסוכן', en: 'Danger area', enroute: true },
+  RR: { he: 'אזור מוגבל', en: 'Restricted area', enroute: true },
+  RM: { he: 'אזור אימונים צבאי', en: 'Military operating area', enroute: true },
+  RT: { he: 'אזור מוגבל זמנית', en: 'Temporary restricted area', enroute: true },
+  RA: { he: 'הקצאת מרחב אווירי', en: 'Airspace reservation', enroute: true },
+  RO: { he: 'אזור חסום', en: 'Overflying restricted', enroute: true },
+  WM: { he: 'ירי טילים / ארטילריה', en: 'Missile or gunnery firing', enroute: true },
+  WE: { he: 'תרגיל צבאי', en: 'Military exercise', enroute: true },
+  WP: { he: 'צניחה חופשית', en: 'Parachute jumping', enroute: true },
+  WU: { he: 'כלי טיס בלתי מאויש', en: 'Unmanned aircraft', enroute: true },
+  WL: { he: 'קרן לייזר', en: 'Laser activity', enroute: true },
+  WA: { he: 'מופע אווירי', en: 'Air display', enroute: true },
+  WB: { he: 'ירי / זיקוקים', en: 'Aerobatics or firing', enroute: true },
+  WZ: { he: 'פעילות חריגה', en: 'Hazard activity', enroute: true },
+  AR: { he: 'נתיב ATS', en: 'ATS route', enroute: true },
+  AF: { he: 'מרחב אווירי / FIR', en: 'FIR or airspace', enroute: true },
+  AC: { he: 'אזור בקרה', en: 'Control area', enroute: true },
+  AN: { he: 'אזור ניווט', en: 'Navigation area', enroute: true },
+  AA: { he: 'גובה מינימלי', en: 'Minimum altitude', enroute: true },
+
+  // Ground and airport subjects: briefed per airport, not in the cruise.
+  OB: { he: 'מכשול', en: 'Obstacle', enroute: false },
+  OL: { he: 'תאורת מכשול', en: 'Obstacle lighting', enroute: false },
+  MR: { he: 'מסלול', en: 'Runway', enroute: false },
+  MX: { he: 'מסלול הסעה', en: 'Taxiway', enroute: false },
+  MN: { he: 'מפרש חניה', en: 'Apron', enroute: false },
+  FA: { he: 'שדה תעופה', en: 'Aerodrome', enroute: false }
+};
+
+/** Conditions that mean the airspace or activity is live. */
+const QCODE_ACTIVE = /^(CA|CS|LW|LC|LT|LP|AS|AW|CE)$/;
+
+const QCODE_CONDITIONS = {
+  CA: { he: 'פעיל', en: 'Activated' },
+  CS: { he: 'פעיל לסירוגין', en: 'Intermittently activated' },
+  CE: { he: 'הורחב', en: 'Extended' },
+  CH: { he: 'שונה', en: 'Changed' },
+  CD: { he: 'הופחת', en: 'Deactivated' },
+  LC: { he: 'סגור', en: 'Closed' },
+  LW: { he: 'סגור לעבודות', en: 'Closed for work' },
+  LT: { he: 'מוגבל', en: 'Limited' },
+  LP: { he: 'מוגבל חלקית', en: 'Partly limited' },
+  AS: { he: 'לא כשיר', en: 'Unserviceable' },
+  AW: { he: 'בוטל', en: 'Withdrawn' },
+  AH: { he: 'שעות שונו', en: 'Hours changed' },
+  XX: { he: 'טקסט חופשי', en: 'Plain language' },
+  TT: { he: 'שינוי זמני', en: 'Temporary change' }
+};
+
+/**
+ * Screens an enroute NOTAM for cruise relevance.
+ * Returns { keep, severity, subject, condition } — severity 2 when the
+ * airspace or activity is live, 1 when it is informational.
+ */
+export function screenEnrouteNotam(notam) {
+  const qcode = (notam.qcode || '').toUpperCase();
+  const match = qcode.match(/^Q([A-Z]{2})([A-Z]{2})$/);
+  if (!match) return { keep: false, severity: 1, subject: null, condition: null };
+
+  const [, subjectCode, conditionCode] = match;
+  const subject = QCODE_SUBJECTS[subjectCode];
+
+  // The Q-code's first letter groups the subject. Only airspace restrictions
+  // (QR), warnings (QW) and ATM (QA) describe something an aircraft in the
+  // cruise flies through; the rest are aerodrome, navaid and service items that
+  // belong to the airport chapters. Screening by group rather than by a lookup
+  // hit means an unlisted code in an irrelevant group is still dropped.
+  const relevantGroup = /^[RWA]$/.test(subjectCode[0]);
+
+  if (!relevantGroup || (subject && !subject.enroute)) {
+    return { keep: false, severity: 1, subject: subject ? phrase(subject) : null, condition: null };
+  }
+
+  const condition = QCODE_CONDITIONS[conditionCode];
+  const live = QCODE_ACTIVE.test(conditionCode);
+
+  return {
+    keep: true,
+    severity: subject && live ? 2 : 1,
+    subject: subject ? phrase(subject) : subjectCode,
+    condition: condition ? phrase(condition) : conditionCode
+  };
+}
+
 /** Is the NOTAM in force at any point between `start` and `end`? */
 export function notamActiveDuring(notam, start, end) {
   if (!start || !end) return true;

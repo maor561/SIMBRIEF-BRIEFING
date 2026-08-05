@@ -9,7 +9,15 @@
  */
 
 import { t } from '../i18n.js';
-import { escapeHtml, fmtNumber, fmtFeet, fmtWeight, fmtDurationShort } from '../decode.js';
+import {
+  escapeHtml,
+  fmtNumber,
+  fmtFeet,
+  fmtWeight,
+  fmtDurationShort,
+  screenEnrouteNotam,
+  notamActiveDuring
+} from '../decode.js';
 import {
   card,
   flushCard,
@@ -58,10 +66,78 @@ export default function renderCruise({ model, findings }) {
       </div>
 
       <div class="col-12">
+        ${enrouteNotamCard(model)}
+      </div>
+
+      <div class="col-12">
         ${collapsible({ title: t('crz.firs'), body: firsBody(model) })}
       </div>
     </div>
   `;
+}
+
+/**
+ * Enroute NOTAMs, cut down to something readable.
+ *
+ * SimBrief ships every NOTAM for every FIR touched — 793 on this route. Almost
+ * all are obstacles and lighting, which belong to an airport briefing, not to
+ * the cruise. What is left is airspace and activity: restricted areas, military
+ * exercises, firing, UAV operations.
+ */
+function enrouteNotamCard(model) {
+  const routeFirs = new Set([
+    ...model.route.firs,
+    ...model.navlog.map((f) => f.fir).filter(Boolean)
+  ]);
+
+  const window = {
+    start: model.times.estOut || model.times.schedOut,
+    end: model.times.estIn || model.times.schedIn
+  };
+
+  const relevant = model.enrouteNotams
+    .filter((n) => !n.location || routeFirs.has(n.location))
+    .filter((n) => notamActiveDuring(n, window.start, window.end))
+    .map((n) => ({ notam: n, screen: screenEnrouteNotam(n) }))
+    .filter(({ screen }) => screen.keep)
+    .sort((a, b) => b.screen.severity - a.screen.severity);
+
+  const live = relevant.filter(({ screen }) => screen.severity === 2);
+
+  if (!relevant.length) {
+    return collapsible({
+      title: t('notam.enroute'),
+      body: `<div class="empty-state">${escapeHtml(t('notam.empty'))}</div>`
+    });
+  }
+
+  const body = relevant
+    .slice(0, 40)
+    .map(
+      ({ notam, screen }) => `<article class="notam sev-${screen.severity}">
+        <div class="top">
+          <span class="nid">${escapeHtml(notam.location || '')} · ${escapeHtml(notam.id || '')}</span>
+          ${screen.subject ? chip(screen.subject, screen.severity === 2 ? 'amber' : '') : ''}
+          ${screen.condition ? chip(screen.condition) : ''}
+        </div>
+        <div class="text">${escapeHtml(notamSummary(notam))}</div>
+      </article>`
+    )
+    .join('');
+
+  return collapsible({
+    title: `${t('notam.enroute')} — ${relevant.length} ${t('common.of')} ${model.enrouteNotams.length}`,
+    badge: live.length ? chip(`${live.length} ${t('sev.warning')}`, 'amber') : '',
+    body: `<div class="img-note" style="padding:9px 13px">${escapeHtml(t('notam.enrouteNote'))}</div>${body}`,
+    open: live.length > 0
+  });
+}
+
+/** The E) field carries the message; the rest of the raw NOTAM is envelope. */
+function notamSummary(notam) {
+  const text = notam.text || notam.raw || '';
+  const body = text.match(/\bE\)\s*([\s\S]*?)(?:\n\s*[FG]\)|$)/);
+  return (body ? body[1] : text).trim().replace(/\s+/g, ' ').slice(0, 320);
 }
 
 /* ------------------------------------------------------------ weather strip */

@@ -148,10 +148,41 @@ function toValue(node) {
   return out;
 }
 
-const [, , inputPath, outputPath] = process.argv;
+/**
+ * Strips SimBrief account identifiers. The fixture ships in a public repo as
+ * demo data; the flight itself is what matters, the account behind it is not.
+ */
+function anonymize(ofp) {
+  if (ofp.params) {
+    ofp.params.user_id = '000000';
+    ofp.params.request_id = '000000000';
+    ofp.params.sequence_id = '000000000000';
+    ofp.params.xml_file = '';
+  }
+  if (ofp.aircraft) {
+    ofp.aircraft.internal_id = '';
+  }
+  if (ofp.crew) {
+    for (const key of Object.keys(ofp.crew)) {
+      if (typeof ofp.crew[key] === 'string') ofp.crew[key] = '';
+    }
+  }
+  delete ofp.prefile;
+  delete ofp.vatsim_prefile;
+  delete ofp.ivao_prefile;
+  delete ofp.pilotedge_prefile;
+  delete ofp.poscon_prefile;
+  delete ofp.api_params;
+  delete ofp.offset_data;
+  return ofp;
+}
+
+const args = process.argv.slice(2);
+const keepIdentity = args.includes('--keep-identity');
+const [inputPath, outputPath] = args.filter((a) => !a.startsWith('--'));
 
 if (!inputPath || !outputPath) {
-  console.error('Usage: node tools/xml2json.js <input.xml> <output.json>');
+  console.error('Usage: node tools/xml2json.js <input.xml> <output.json> [--keep-identity]');
   process.exit(1);
 }
 
@@ -164,7 +195,7 @@ if (!ofpNode) {
   process.exit(1);
 }
 
-const ofp = toValue(ofpNode);
+const ofp = keepIdentity ? toValue(ofpNode) : anonymize(toValue(ofpNode));
 
 mkdirSync(dirname(outputPath), { recursive: true });
 writeFileSync(outputPath, JSON.stringify(ofp, null, 1), 'utf8');
