@@ -40,6 +40,16 @@
   box-sizing: border-box;
 }
 
+/*
+ * The `hidden` attribute only works through the UA rule `[hidden]{display:none}`,
+ * which any author `display` declaration outranks. `.app` and `.overlay` both set
+ * `display: grid`, so setting `hidden` on them did nothing and the setup screen
+ * stayed on top of a fully loaded briefing. Keep this above every layout rule.
+ */
+[hidden] {
+  display: none !important;
+}
+
 html,
 body {
   margin: 0;
