@@ -453,16 +453,17 @@ function checkNotams(model, findings) {
 
       // Many closures only bite inside a daily window. We show the schedule
       // rather than trying to parse it, so the crew judges the overlap.
+      const notamBody = notam.text || notam.raw || '';
       const scheduleNote = notam.schedule
-        ? bilingual(`\nחלון פעילות: ${notam.schedule} — ודא חפיפה לזמן הטיסה.`, `\nActive window: ${notam.schedule} — check the overlap with your times.`)
-        : '';
+        ? { he: `\nחלון פעילות: ${notam.schedule} — ודא חפיפה לזמן הטיסה.`, en: `\nActive window: ${notam.schedule} — check the overlap with your times.` }
+        : { he: '', en: '' };
 
       findings.push(
         finding(
           hitsPlanned ? SEVERITY.CRITICAL : severity,
           chapter,
           title,
-          `${notam.text || notam.raw || ''}${scheduleNote}`,
+          bilingual(`${notamBody}${scheduleNote.he}`, `${notamBody}${scheduleNote.en}`),
           { icao: airport.icao, notamId: notam.id }
         )
       );

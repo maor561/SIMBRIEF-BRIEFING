@@ -4,14 +4,29 @@
  */
 
 import { t } from '../i18n.js';
-import { escapeHtml, fmtNumber, fmtWeight, fmtDuration, fmtZulu, categoryClass, notamSeverity, notamActiveDuring, sanitizeNotamHtml } from '../decode.js';
+import {
+  escapeHtml,
+  fmtNumber,
+  fmtWeight,
+  fmtFeet,
+  fmtDuration,
+  fmtZulu,
+  categoryClass,
+  notamSeverity,
+  notamActiveDuring,
+  sanitizeNotamHtml,
+  parseMetar,
+  describeWind,
+  ceilingOf
+} from '../decode.js';
 import {
   card,
   flushCard,
   tiles,
   chip,
   chapterHeading,
-  findingsList
+  findingsList,
+  windRose
 } from '../ui.js';
 import { SEVERITY } from '../analyze.js';
 
@@ -71,7 +86,7 @@ function numbersBody(model) {
   ]);
 }
 
-/** One line per airport: category, wind, and the raw METAR. */
+/** One row per airport: wind rose, category, and the decoded figures at a glance. */
 function weatherLines(model) {
   const entries = [
     { airport: model.origin, role: t('nav.departure') },
@@ -80,18 +95,31 @@ function weatherLines(model) {
   ].filter((e) => e.airport);
 
   return `<div class="rows">${entries
-    .map(
-      ({ airport, role }) => `<div class="row" style="align-items:flex-start">
-        <span style="min-width:104px">
+    .map(({ airport, role }) => {
+      const m = airport.metar ? parseMetar(airport.metar) : null;
+      const ceiling = m ? ceilingOf(m) : null;
+      const visibility = m?.cavok
+        ? '10+ km'
+        : m?.visibility?.unlimited
+        ? '10+ km'
+        : m?.visibility?.metres
+        ? `${fmtNumber(m.visibility.metres)} m`
+        : '—';
+
+      return `<div class="row" style="align-items:center;gap:11px">
+        ${windRose(m?.wind?.direction, m?.wind?.speed)}
+        <span style="min-width:96px">
           <span class="ltr" style="font-weight:700">${escapeHtml(airport.icao)}</span>
           <span style="display:block;font-size:10.5px;color:var(--dimmer)">${escapeHtml(role)}</span>
         </span>
-        <span class="grow">
+        <span class="grow" style="display:flex;gap:11px;flex-wrap:wrap;align-items:center;font-size:12px;color:var(--dim)">
           ${airport.metarCategory ? `<span class="chip ${categoryClass(airport.metarCategory)}">${escapeHtml(airport.metarCategory.toUpperCase())}</span>` : ''}
-          <div class="ltr" style="font-size:12px;margin-block-start:4px;white-space:pre-wrap;overflow-wrap:anywhere">${escapeHtml(airport.metar || '—')}</div>
+          <span class="ltr">${escapeHtml(m ? describeWind(m.wind) : '—')}</span>
+          <span>${escapeHtml(visibility)}</span>
+          <span>${ceiling ? fmtFeet(ceiling) : m?.cavok ? 'CAVOK' : '—'}</span>
         </span>
-      </div>`
-    )
+      </div>`;
+    })
     .join('')}</div>`;
 }
 

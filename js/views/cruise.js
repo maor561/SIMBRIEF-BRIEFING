@@ -71,8 +71,23 @@ export default function renderCruise({ model, findings }) {
       </div>
 
       <div class="col-12">
-        ${collapsible({ title: t('crz.firs'), body: firsBody(model) })}
+        ${flushCard({ title: t('common.route'), body: routeBody(model) })}
       </div>
+    </div>
+  `;
+}
+
+function routeBody(model) {
+  const route = model.route;
+  return `
+    ${tiles([
+      { label: t('common.distance'), value: fmtNumber(route.distance), unit: 'nm', size: 'big' },
+      { label: t('sum.airDistance'), value: fmtNumber(route.airDistance), unit: 'nm' }
+    ])}
+    <div style="padding:0 13px 13px">
+      ${route.firs.length ? `<div style="display:flex;gap:7px;flex-wrap:wrap;margin-block-end:9px">${route.firs.map((fir) => chip(fir, 'blue')).join('')}</div>` : ''}
+      <div class="raw-wx">${escapeHtml(route.text || '')}</div>
+      ${route.section18 ? `<div class="raw-wx" style="margin-block-start:9px">${escapeHtml(route.section18)}</div>` : ''}
     </div>
   `;
 }
@@ -418,7 +433,7 @@ function chartsBody(model) {
  * the cruise evenly between levels, so ties resolve upward — the later, higher
  * level is the one still ahead of the crew when they open the briefing.
  */
-function dominantCruiseAltitude(model) {
+export function dominantCruiseAltitude(model) {
   const counts = new Map();
   for (const fix of model.phases.cruise) {
     if (!Number.isFinite(fix.altitude)) continue;
@@ -565,11 +580,3 @@ function cruiseFactsBody(model) {
   `;
 }
 
-function firsBody(model) {
-  const firs = model.route.firs;
-  if (!firs.length) return `<div class="empty-state">${escapeHtml(t('common.none'))}</div>`;
-  return `<div style="display:flex;gap:7px;flex-wrap:wrap">
-    ${firs.map((fir) => chip(fir, 'blue')).join('')}
-  </div>
-  ${model.route.section18 ? `<div class="raw-wx" style="margin-block-start:11px">${escapeHtml(model.route.section18)}</div>` : ''}`;
-}

@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "simbrief-dev",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["tools/serve.js"],
+      "port": 3000
+    }
+  ]
+}

@@ -21,7 +21,8 @@ import {
   chapterFindings,
   tafBlock,
   metarBlock,
-  joinParts
+  joinParts,
+  landingPerformanceBody
 } from '../ui.js';
 
 export default function renderDescent({ model, findings }) {
@@ -62,7 +63,11 @@ export default function renderDescent({ model, findings }) {
         })}
       </div>
 
-      <div class="col-12">
+      <div class="col-7">
+        ${flushCard({ title: t('arr.landingPerf'), body: landingPerformanceBody(model) })}
+      </div>
+
+      <div class="col-5">
         ${flushCard({ title: t('des.terrain'), body: terrainBody(model) })}
       </div>
     </div>

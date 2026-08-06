@@ -282,6 +282,26 @@ export function tafBlock(airport, reference) {
     .join('')}</div>`;
 }
 
+/** Enroute SIGMETs, if any. A clean "none" state is itself useful information. */
+export function sigmetCard(model) {
+  const items = model.sigmets || [];
+  return flushCard({
+    title: t('wx.sigmet'),
+    badge: items.length ? chip(`${items.length}`, 'amber') : chip('0', 'green'),
+    body: items.length
+      ? `<div class="rows">${items
+          .map(
+            (s) => `<div class="row" style="align-items:flex-start;flex-direction:column;gap:5px">
+              ${s.fir ? chip(s.fir, 'blue') : ''}
+              <div class="raw-wx">${escapeHtml(s.text)}</div>
+            </div>`
+          )
+          .join('')}</div>`
+      : `<div class="empty-state good">${escapeHtml(t('wx.sigmetEmpty'))}</div>`,
+    cls: items.length ? 'accent-amber' : ''
+  });
+}
+
 export function atisBlock(airport) {
   if (!airport?.atis?.length) return '';
   // Multiple networks may publish; the last entry is the freshest.
@@ -368,6 +388,64 @@ export function notamCard(airport, window) {
     body: `${tools}<div data-notam-list data-icao="${airport.icao}">${notamListMarkup(airport, window)}</div>`,
     cls: criticalCount ? 'accent-red' : ''
   });
+}
+
+/**
+ * Landing performance for the planned runway: LDA, flap, ILS, the runway
+ * drawn to scale, wind components and the weight-vs-limit meter. Shared by
+ * the arrival chapter (full detail) and the descent chapter (reviewed ahead
+ * of top of descent, before workload picks up).
+ */
+export function landingPerformanceBody(model) {
+  const tlr = model.tlr.landing;
+  if (!tlr) return `<div class="empty-state">${escapeHtml(t('common.notAvailable'))}</div>`;
+
+  const runway = tlr.runways.find((r) => r.identifier === tlr.plannedRunway) || tlr.runways[0];
+  if (!runway) return `<div class="empty-state">${escapeHtml(t('common.notAvailable'))}</div>`;
+
+  const maxWeight = runway.maxWeightDry ?? model.weights.maxLdw;
+  const isTailwind = Number.isFinite(runway.headwind) && runway.headwind < 0;
+
+  return `
+    ${tiles([
+      { label: t('common.runway'), value: escapeHtml(runway.identifier), size: 'huge', tone: 'info' },
+      { label: t('arr.lda'), value: fmtNumber(runway.lda), unit: 'ft', size: 'big' },
+      { label: t('to.flap'), value: tlr.flap || runway.flap || '—', size: 'big' },
+      { label: 'ILS', value: runway.ils || '—' }
+    ])}
+
+    <div style="padding:13px">
+      ${runwayBar(runway, { showStop: false })}
+    </div>
+
+    <div style="padding:0 13px">
+      ${tiles([
+        {
+          label: isTailwind ? t('to.tailwind') : t('to.headwind'),
+          value: Number.isFinite(runway.headwind) ? String(Math.abs(runway.headwind)) : '—',
+          unit: 'kt',
+          tone: isTailwind ? 'bad' : 'good'
+        },
+        {
+          label: t('to.crosswind'),
+          value: Number.isFinite(runway.crosswind) ? String(runway.crosswind) : '—',
+          unit: 'kt',
+          tone: !Number.isFinite(runway.crosswind) ? '' : runway.crosswind >= 25 ? 'bad' : runway.crosswind >= 15 ? 'warn' : 'good'
+        },
+        { label: t('arr.gradient'), value: runway.gradient === null ? '—' : `${runway.gradient}%` },
+        { label: t('common.temp'), value: tlr.temperature === null ? '—' : `${tlr.temperature}°C` }
+      ])}
+    </div>
+
+    <div style="padding:13px">
+      ${meter({ label: t('arr.ldw'), value: tlr.plannedWeight ?? model.weights.estLdw, max: maxWeight, units: model.units })}
+      ${kv([
+        [t('arr.maxDry'), runway.maxWeightDry ? fmtWeight(runway.maxWeightDry, model.units) : '—'],
+        [t('arr.maxWet'), runway.maxWeightWet ? fmtWeight(runway.maxWeightWet, model.units) : '—'],
+        [t('to.surface'), tlr.surface || '—']
+      ])}
+    </div>
+  `;
 }
 
 /* ------------------------------------------------------------------ runway */

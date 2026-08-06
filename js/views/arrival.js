@@ -13,10 +13,7 @@ import {
   flushCard,
   collapsible,
   tiles,
-  kv,
   chip,
-  meter,
-  runwayBar,
   runwayTable,
   chapterHeading,
   chapterFindings,
@@ -25,7 +22,8 @@ import {
   tafBlock,
   atisBlock,
   notamCard,
-  notamListMarkup
+  notamListMarkup,
+  landingPerformanceBody
 } from '../ui.js';
 import { notamSeverity, categoryClass } from '../decode.js';
 
@@ -48,7 +46,7 @@ export default function renderArrival({ model, findings }) {
       ${findings.some((f) => f.chapter === 'arrival') ? `<div class="col-12">${chapterFindings(findings, 'arrival')}</div>` : ''}
 
       <div class="col-7">
-        ${flushCard({ title: t('arr.landingPerf'), body: landingBody(model) })}
+        ${flushCard({ title: t('arr.landingPerf'), body: landingPerformanceBody(model) })}
       </div>
 
       <div class="col-5">
@@ -72,58 +70,6 @@ export default function renderArrival({ model, findings }) {
       <div class="col-12">
         ${collapsible({ title: t('to.otherRunways'), body: runwayTable(model.tlr.landing, { landing: true }) })}
       </div>
-    </div>
-  `;
-}
-
-function landingBody(model) {
-  const tlr = model.tlr.landing;
-  if (!tlr) return `<div class="empty-state">${escapeHtml(t('common.notAvailable'))}</div>`;
-
-  const runway = tlr.runways.find((r) => r.identifier === tlr.plannedRunway) || tlr.runways[0];
-  if (!runway) return `<div class="empty-state">${escapeHtml(t('common.notAvailable'))}</div>`;
-
-  const maxWeight = runway.maxWeightDry ?? model.weights.maxLdw;
-  const isTailwind = Number.isFinite(runway.headwind) && runway.headwind < 0;
-
-  return `
-    ${tiles([
-      { label: t('common.runway'), value: escapeHtml(runway.identifier), size: 'huge', tone: 'info' },
-      { label: t('arr.lda'), value: fmtNumber(runway.lda), unit: 'ft', size: 'big' },
-      { label: t('to.flap'), value: tlr.flap || runway.flap || '—', size: 'big' },
-      { label: 'ILS', value: runway.ils || '—' }
-    ])}
-
-    <div style="padding:13px">
-      ${runwayBar(runway, { showStop: false })}
-    </div>
-
-    <div style="padding:0 13px">
-      ${tiles([
-        {
-          label: isTailwind ? t('to.tailwind') : t('to.headwind'),
-          value: Number.isFinite(runway.headwind) ? String(Math.abs(runway.headwind)) : '—',
-          unit: 'kt',
-          tone: isTailwind ? 'bad' : 'good'
-        },
-        {
-          label: t('to.crosswind'),
-          value: Number.isFinite(runway.crosswind) ? String(runway.crosswind) : '—',
-          unit: 'kt',
-          tone: !Number.isFinite(runway.crosswind) ? '' : runway.crosswind >= 25 ? 'bad' : runway.crosswind >= 15 ? 'warn' : 'good'
-        },
-        { label: t('arr.gradient'), value: runway.gradient === null ? '—' : `${runway.gradient}%` },
-        { label: t('common.temp'), value: tlr.temperature === null ? '—' : `${tlr.temperature}°C` }
-      ])}
-    </div>
-
-    <div style="padding:13px">
-      ${meter({ label: t('arr.ldw'), value: tlr.plannedWeight ?? model.weights.estLdw, max: maxWeight, units: model.units })}
-      ${kv([
-        [t('arr.maxDry'), runway.maxWeightDry ? fmtWeight(runway.maxWeightDry, model.units) : '—'],
-        [t('arr.maxWet'), runway.maxWeightWet ? fmtWeight(runway.maxWeightWet, model.units) : '—'],
-        [t('to.surface'), tlr.surface || '—']
-      ])}
     </div>
   `;
 }

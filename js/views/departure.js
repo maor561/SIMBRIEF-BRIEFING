@@ -10,18 +10,18 @@ import {
   flushCard,
   collapsible,
   tiles,
-  tile,
   meter,
   kv,
-  chip,
   chapterHeading,
   chapterFindings,
   airportIdentity,
   metarBlock,
   tafBlock,
   atisBlock,
-  notamCard
+  notamCard,
+  sigmetCard
 } from '../ui.js';
+import { dominantCruiseAltitude } from './cruise.js';
 
 export default function renderDeparture({ model, findings }) {
   const airport = model.origin;
@@ -37,6 +37,8 @@ export default function renderDeparture({ model, findings }) {
     ${chapterHeading(`${airport.icao} · ${airport.name || ''}`, t('dep.title'))}
 
     <div class="grid">
+      <div class="col-12">${flushCard({ headless: true, body: flightGlanceBody(model) })}</div>
+
       <div class="col-12">${flushCard({ title: t('common.runway'), headless: true, body: airportIdentity(airport) })}</div>
 
       ${findings.some((f) => f.chapter === 'departure') ? `<div class="col-12">${chapterFindings(findings, 'departure')}</div>` : ''}
@@ -65,6 +67,8 @@ export default function renderDeparture({ model, findings }) {
         ${flushCard({ title: t('dep.times'), body: timesBody(model) })}
       </div>
 
+      <div class="col-12">${sigmetCard(model)}</div>
+
       <div class="col-12">${atisBlock(airport)}</div>
 
       <div class="col-12">
@@ -73,6 +77,56 @@ export default function renderDeparture({ model, findings }) {
           body: routeBody(model)
         })}
       </div>
+    </div>
+  `;
+}
+
+/**
+ * The whole flight read as a journey, not a table: departure and destination
+ * anchor the two ends, the route line between them carries the level and
+ * cost index a crew would otherwise have to go find in the cruise chapter,
+ * and the alternate branches off visibly rather than competing for the same
+ * weight as the primary airports.
+ */
+function flightGlanceBody(model) {
+  const cruiseAlt = dominantCruiseAltitude(model) || model.flight.initialAltitude;
+  const etd = model.times.estOff || model.times.schedOff;
+  const eta = model.times.estOn || model.times.schedOn;
+  const altn = model.alternates[0];
+
+  return `
+    <div class="glance">
+      <div class="glance-flight">
+        <span class="glance-label">${escapeHtml(t('dep.flightNumber'))}</span>
+        <span class="glance-flightnum ltr">${escapeHtml(model.flight.number || model.flight.callsign || '—')}</span>
+      </div>
+
+      <div class="glance-route">
+        <div class="glance-endpoint">
+          <span class="glance-icao">${escapeHtml(model.origin?.icao || '—')}</span>
+          <span class="glance-time">${escapeHtml(t('header.etd'))} <b class="ltr">${escapeHtml(fmtZulu(etd))}</b></span>
+        </div>
+
+        <div class="glance-path">
+          <span class="glance-level ltr">${cruiseAlt ? `FL${Math.round(cruiseAlt / 100)}` : '—'} · CI ${model.flight.costIndex ?? '—'}</span>
+          <span class="glance-line"></span>
+          <span class="glance-duration ltr">${fmtDuration(model.times.estTimeEnroute ?? model.times.estBlock)}</span>
+        </div>
+
+        <div class="glance-endpoint">
+          <span class="glance-icao">${escapeHtml(model.destination?.icao || '—')}</span>
+          <span class="glance-time">${escapeHtml(t('dep.landingTime'))} <b class="ltr">${escapeHtml(fmtZulu(eta))}</b></span>
+        </div>
+      </div>
+
+      ${
+        altn
+          ? `<div class="glance-altn">
+               <span class="glance-label">${escapeHtml(t('dep.alternate'))}</span>
+               <span class="glance-altn-icao ltr">${escapeHtml(altn.icao)}</span>
+             </div>`
+          : ''
+      }
     </div>
   `;
 }

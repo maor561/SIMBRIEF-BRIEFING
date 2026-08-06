@@ -70,6 +70,8 @@ const STRINGS = {
 
     'wx.metar': 'METAR',
     'wx.taf': 'TAF',
+    'wx.sigmet': 'SIGMET',
+    'wx.sigmetEmpty': 'אין SIGMET פעילים לטיסה זו',
     'wx.atis': 'ATIS',
     'wx.issued': 'עודכן',
     'wx.cavok': 'CAVOK — ראות ותקרה מעל המינימום',
@@ -94,6 +96,11 @@ const STRINGS = {
     'notam.enrouteNote': 'רק הודעות בחומרה גבוהה מה-FIRים שבמסלול',
 
     'dep.title': 'שדה המראה',
+    'dep.glance': 'תמונת מצב',
+    'dep.cruiseAlt': 'גובה שיוט',
+    'dep.flightNumber': 'מספר טיסה',
+    'dep.flightTime': 'זמן טיסה',
+    'dep.landingTime': 'נחיתה',
     'dep.loading': 'טעינה ומשקלים',
     'dep.fuelPlan': 'תכנון דלק',
     'dep.times': 'זמנים',
@@ -299,6 +306,8 @@ const STRINGS = {
 
     'wx.metar': 'METAR',
     'wx.taf': 'TAF',
+    'wx.sigmet': 'SIGMET',
+    'wx.sigmetEmpty': 'No active SIGMETs for this flight',
     'wx.atis': 'ATIS',
     'wx.issued': 'Issued',
     'wx.cavok': 'CAVOK — ceiling and visibility OK',
@@ -323,6 +332,11 @@ const STRINGS = {
     'notam.enrouteNote': 'High-severity items from FIRs along the route only',
 
     'dep.title': 'Departure Airport',
+    'dep.glance': 'Flight at a Glance',
+    'dep.cruiseAlt': 'Cruise altitude',
+    'dep.flightNumber': 'Flight number',
+    'dep.flightTime': 'Flight time',
+    'dep.landingTime': 'Landing',
     'dep.loading': 'Loading & Weights',
     'dep.fuelPlan': 'Fuel Plan',
     'dep.times': 'Times',
