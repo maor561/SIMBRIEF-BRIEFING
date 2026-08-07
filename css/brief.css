@@ -338,19 +338,32 @@ button {
   color: var(--dimmer);
 }
 
+/*
+ * Masonry via CSS multi-column rather than grid. A row-based grid sets each
+ * row's height to its tallest card, so every shorter neighbour leaves dead
+ * space below it -- that's the "gaps, no continuous flow" problem. Columns
+ * let each card start immediately under the one above it in its own column,
+ * the way a card wall actually packs. col-12 breaks the flow for a full-width
+ * section; every narrower span (col-4..col-8) is now just "half" -- multicol
+ * doesn't support fractional widths within a row, so the old fine-grained
+ * 7/5 split collapses to a uniform column width. The column-width hint also
+ * replaces the old breakpoints: the browser drops to one column on its own
+ * once it can't fit two at that width, so portrait/mobile need no override.
+ */
 .grid {
-  display: grid;
-  gap: 12px;
-  grid-template-columns: repeat(12, 1fr);
-  align-items: start;
+  columns: 2 380px;
+  column-gap: 12px;
 }
 
-.col-4 { grid-column: span 4; }
-.col-5 { grid-column: span 5; }
-.col-6 { grid-column: span 6; }
-.col-7 { grid-column: span 7; }
-.col-8 { grid-column: span 8; }
-.col-12 { grid-column: span 12; }
+.grid > * {
+  break-inside: avoid;
+  width: 100%;
+  margin-block-end: 12px;
+}
+
+.col-12 {
+  column-span: all;
+}
 
 .card {
   background: var(--panel);
@@ -1518,16 +1531,6 @@ table.rw-table tr.planned td:first-child {
   .rail-badge { inset-block-start: 2px; inset-inline-end: 50%; margin-inline-end: -26px; }
 
   .content { padding: 12px 13px 26px; }
-
-  .col-4, .col-5, .col-6, .col-7, .col-8 { grid-column: span 12; }
-}
-
-/* Narrow landscape (smaller tablets) keeps the rail but relaxes the grid. */
-@media (min-width: 901px) and (max-width: 1100px) {
-  .col-4 { grid-column: span 6; }
-  .col-5 { grid-column: span 6; }
-  .col-7 { grid-column: span 6; }
-  .col-8 { grid-column: span 12; }
 }
 
 /* ------------------------------------------------------------------ print */
@@ -1539,6 +1542,7 @@ table.rw-table tr.planned td:first-child {
   .app { display: block; height: auto; }
   .body { display: block; }
   .content { overflow: visible; padding: 0; }
+  .grid { columns: 1; }
   .card { break-inside: avoid; border-color: #bbb; }
   .card, .tile, .notam, .raw-wx, .taf-group { background: #fff !important; color: #000; }
   .tile .value, .finding .title { color: #000 !important; }
