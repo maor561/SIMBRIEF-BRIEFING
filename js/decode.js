@@ -601,3 +601,18 @@ export function categoryClass(category) {
       return 'cat-unknown';
   }
 }
+
+/**
+ * Which icon best represents a NOTAM's subject, so a list reads by shape and
+ * colour before anyone reads a word of it -- the same idea EFBs use for
+ * graphical NOTAMs on an airport diagram, applied to a text list.
+ */
+export function notamIconName(notam) {
+  const subject = `${notam.subject || ''} ${notam.text || notam.raw || ''}`.toLowerCase();
+  if (notam.isObstacle || /obstacle|crane|antenna/.test(subject)) return 'obstacle';
+  if (/light/.test(subject)) return 'lighting';
+  if (/taxiway|twy/.test(subject)) return 'taxiway';
+  if (/runway|rwy/.test(subject)) return 'runway';
+  if (/airspace|restricted|danger|military|aerodrome|ad ltd/.test(subject)) return 'airspace';
+  return 'info';
+}

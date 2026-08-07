@@ -14,6 +14,7 @@ import {
   categoryClass,
   notamSeverity,
   notamActiveDuring,
+  notamIconName,
   sanitizeNotamHtml,
   parseMetar,
   describeWind,
@@ -24,6 +25,8 @@ import {
   flushCard,
   tiles,
   chip,
+  icon,
+  categoryDot,
   chapterHeading,
   findingsList,
   windRose
@@ -108,9 +111,12 @@ function weatherLines(model) {
 
       return `<div class="row" style="align-items:center;gap:11px">
         ${windRose(m?.wind?.direction, m?.wind?.speed)}
-        <span style="min-width:96px">
-          <span class="ltr" style="font-weight:700">${escapeHtml(airport.icao)}</span>
-          <span style="display:block;font-size:10.5px;color:var(--dimmer)">${escapeHtml(role)}</span>
+        <span style="min-width:96px;display:flex;align-items:center;gap:6px">
+          ${categoryDot(airport.metarCategory)}
+          <span>
+            <span class="ltr" style="font-weight:700">${escapeHtml(airport.icao)}</span>
+            <span style="display:block;font-size:10.5px;color:var(--dimmer)">${escapeHtml(role)}</span>
+          </span>
         </span>
         <span class="grow" style="display:flex;gap:11px;flex-wrap:wrap;align-items:center;font-size:12px;color:var(--dim)">
           ${airport.metarCategory ? `<span class="chip ${categoryClass(airport.metarCategory)}">${escapeHtml(airport.metarCategory.toUpperCase())}</span>` : ''}
@@ -190,6 +196,7 @@ function topNotams(model) {
     .map(
       ({ notam, airport, severity }) => `<article class="notam sev-${severity}">
         <div class="top">
+          <span class="notam-icon">${icon(notamIconName(notam), { size: 15 })}</span>
           <span class="nid">${escapeHtml(airport.icao)} · ${escapeHtml(notam.id || '')}</span>
           ${notam.subject ? chip(notam.subject, severity === 3 ? 'red' : 'amber') : ''}
           ${notam.status ? chip(notam.status) : ''}

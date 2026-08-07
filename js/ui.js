@@ -23,6 +23,7 @@ import {
   categoryClass,
   notamSeverity,
   notamActiveDuring,
+  notamIconName,
   decodeSurface
 } from './decode.js';
 import { severityClass, severityLabel, SEVERITY } from './analyze.js';
@@ -37,6 +38,41 @@ export const html = (strings, ...values) =>
  */
 export function joinParts(parts, separator = ' · ') {
   return parts.filter((part) => part !== null && part !== undefined && String(part).trim() !== '').join(separator);
+}
+
+/* ------------------------------------------------------------------- icons */
+
+/**
+ * A small line-icon set in the same stroke style as the nav rail glyphs
+ * (round joins, no fill), so the vocabulary reads as one system rather than
+ * text labels bolted onto a dashboard. `aircraft` reuses the takeoff rail
+ * glyph's plane silhouette on purpose.
+ */
+const ICON_PATHS = {
+  aircraft: 'M4.5 14.5l3.5.6 9.2-8a1.7 1.7 0 0 1 2.4 2.4l-8 9.2.6 3.5-1.8-.6-1.4-3-3-1.4z',
+  wind: 'M3 8h11a2.5 2.5 0 1 0-2.4-3.2M3 12.5h15a2.7 2.7 0 1 1-2.6 3.4M3 17h8a2 2 0 1 1-1.9 2.6',
+  visibility: 'M2 12S6 5 12 5s10 7 10 7-4 7-10 7-10-7-10-7zM12 9.4a2.6 2.6 0 1 0 0 5.2 2.6 2.6 0 0 0 0-5.2z',
+  ceiling: 'M7.5 18a4.2 4.2 0 0 1-.7-8.34 5.3 5.3 0 0 1 10.2-1.9A4.3 4.3 0 0 1 16.8 18H7.5z',
+  temperature: 'M13 14.76V5a1.8 1.8 0 1 0-3.6 0v9.76a4 4 0 1 0 3.6 0z',
+  clock: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 7v5l3.2 1.9',
+  runway: 'M3 9h18M3 15h18M9 12h2M13 12h2',
+  taxiway: 'M3 13c4.5 0 4.5-6.5 9-6.5S16.5 13 21 13',
+  lighting: 'M9.3 18h5.4M10.2 20.7h3.6M8.2 13.6A3.8 3.8 0 1 1 15.8 13.6c0 1.7-.9 2.5-1.4 3.1-.3.4-.5.7-.5 1.5H9.9c0-.8-.1-1.1-.4-1.5-.5-.6-1.3-1.4-1.3-3.1z',
+  obstacle: 'M12 3.6 21 19.4H3zM12 9.6v4.3M12 16.7h.01',
+  airspace: 'M12 3 4.5 6.4V12c0 5 3.4 7.9 7.5 9 4.1-1.1 7.5-4 7.5-9V6.4z',
+  info: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 8h.01M11.1 11h1.4v6h-1.4'
+};
+
+export function icon(name, { size = 15 } = {}) {
+  const d = ICON_PATHS[name];
+  if (!d) return '';
+  return `<svg class="icon" width="${size}" height="${size}" viewBox="0 0 24 24" aria-hidden="true"><path d="${d}"/></svg>`;
+}
+
+/** Compact flight-category indicator for dense rows -- the dot ForeFlight uses in list views. */
+export function categoryDot(category) {
+  if (!category) return '';
+  return `<span class="cat-dot ${categoryClass(category)}"></span>`;
 }
 
 /* ------------------------------------------------------------------- cards */
@@ -71,9 +107,9 @@ export function collapsible({ title, badge, body, open = false, cls = '' }) {
  * A single figure. `tone` drives colour: good / warn / bad / info.
  * `size` accepts 'big' or 'huge' for the numbers that deserve the room.
  */
-export function tile({ label, value, unit, hint, tone = '', size = '' }) {
+export function tile({ label, value, unit, hint, tone = '', size = '', icon: iconName = '' }) {
   return `<div class="tile ${tone} ${size}">
-    <div class="label">${escapeHtml(label)}</div>
+    <div class="label">${iconName ? icon(iconName, { size: 12 }) : ''}${escapeHtml(label)}</div>
     <div class="value">${value ?? '—'}${unit ? `<span class="unit">${escapeHtml(unit)}</span>` : ''}</div>
     ${hint ? `<div class="hint">${hint}</div>` : ''}
   </div>`;
@@ -228,7 +264,7 @@ export function metarBlock(airport) {
       ${windRose(m.wind?.direction, m.wind?.speed)}
       <div style="min-width:0;flex:1">
         <div style="display:flex;gap:7px;align-items:center;flex-wrap:wrap;margin-block-end:3px">
-          ${category ? `<span class="chip ${categoryClass(category)}">${escapeHtml(t(`wx.category.${category}`, category.toUpperCase()))}</span>` : ''}
+          ${category ? `<span class="chip ${categoryClass(category)}">${categoryDot(category)}${escapeHtml(t(`wx.category.${category}`, category.toUpperCase()))}</span>` : ''}
           ${m.cavok ? chip('CAVOK', 'green') : ''}
           ${m.trend ? chip(m.trend) : ''}
           ${weatherText ? chip(weatherText, 'amber') : ''}
@@ -240,10 +276,10 @@ export function metarBlock(airport) {
     </div>
 
     ${tiles([
-      { label: t('common.wind'), value: escapeHtml(describeWind(m.wind)), size: '' },
-      { label: t('common.visibility'), value: visibility },
-      { label: t('common.ceiling'), value: ceiling ? fmtFeet(ceiling) : (m.cavok ? 'CAVOK' : '—') },
-      { label: t('common.temp'), value: m.temperature === null ? '—' : `${m.temperature}°`, hint: m.dewpoint === null ? '' : `${t('common.dewpoint')} ${m.dewpoint}°` },
+      { label: t('common.wind'), value: escapeHtml(describeWind(m.wind)), size: '', icon: 'wind' },
+      { label: t('common.visibility'), value: visibility, icon: 'visibility' },
+      { label: t('common.ceiling'), value: ceiling ? fmtFeet(ceiling) : (m.cavok ? 'CAVOK' : '—'), icon: 'ceiling' },
+      { label: t('common.temp'), value: m.temperature === null ? '—' : `${m.temperature}°`, hint: m.dewpoint === null ? '' : `${t('common.dewpoint')} ${m.dewpoint}°`, icon: 'temperature' },
       { label: t('common.qnh'), value: m.qnhHpa ? String(m.qnhHpa) : '—', hint: m.qnhInHg ? `${m.qnhInHg.toFixed(2)} inHg` : '' }
     ])}
 
@@ -354,6 +390,7 @@ export function notamListMarkup(airport, window) {
 
       return `<article class="notam sev-${severity}">
         <div class="top">
+          <span class="notam-icon">${icon(notamIconName(notam), { size: 15 })}</span>
           <span class="nid">${escapeHtml(notam.id || '')}</span>
           ${notam.subject ? chip(notam.subject, severity === 3 ? 'red' : severity === 2 ? 'amber' : '') : ''}
           ${notam.status ? chip(notam.status) : ''}
@@ -574,9 +611,9 @@ export function airportIdentity(airport) {
   ]);
 }
 
-export function chapterHeading(title, subtitle) {
+export function chapterHeading(title, subtitle, dot = '') {
   return `<div class="chapter-title">
-    <h1>${escapeHtml(title)}</h1>
+    <h1>${dot}${escapeHtml(title)}</h1>
     ${subtitle ? `<span class="sub">${escapeHtml(subtitle)}</span>` : ''}
   </div>`;
 }

@@ -16,7 +16,8 @@ import {
   fmtWeight,
   fmtDurationShort,
   screenEnrouteNotam,
-  notamActiveDuring
+  notamActiveDuring,
+  notamIconName
 } from '../decode.js';
 import {
   card,
@@ -25,6 +26,7 @@ import {
   tiles,
   kv,
   chip,
+  icon,
   chapterHeading,
   chapterFindings,
   joinParts
@@ -132,6 +134,7 @@ function enrouteNotamCard(model) {
     .map(
       ({ notam, screen }) => `<article class="notam sev-${screen.severity}">
         <div class="top">
+          <span class="notam-icon">${icon(notamIconName(notam), { size: 15 })}</span>
           <span class="nid">${escapeHtml(notam.location || '')} · ${escapeHtml(notam.id || '')}</span>
           ${screen.subject ? chip(screen.subject, screen.severity === 2 ? 'amber' : '') : ''}
           ${screen.condition ? chip(screen.condition) : ''}

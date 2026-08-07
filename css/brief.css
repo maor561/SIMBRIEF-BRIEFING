@@ -319,9 +319,18 @@ button {
 
 .chapter-title h1 {
   margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 9px;
   font-size: 21px;
   font-weight: 700;
   letter-spacing: -0.01em;
+}
+
+.chapter-title h1 .cat-dot {
+  width: 11px;
+  height: 11px;
+  min-width: 11px;
 }
 
 .chapter-title .sub {
@@ -480,8 +489,8 @@ details.card[open] > summary::after {
 .glance-icao {
   display: block;
   font-family: var(--mono);
-  font-size: 34px;
-  font-weight: 800;
+  font-size: 27px;
+  font-weight: 700;
   letter-spacing: -0.01em;
   line-height: 1;
 }
@@ -517,21 +526,29 @@ details.card[open] > summary::after {
 .glance-line {
   position: relative;
   width: 100%;
-  height: 2px;
-  border-radius: 2px;
-  background: linear-gradient(90deg, var(--line-solid), var(--blue) 12%, var(--blue) 88%, var(--line-solid));
+  height: 1px;
+  background: var(--line-solid);
 }
 
-.glance-line::after {
-  content: '';
+.glance-plane {
   position: absolute;
-  inset-inline-end: -1px;
+  inset-inline-start: 50%;
   inset-block-start: 50%;
-  width: 6px;
-  height: 6px;
-  border-inline-end: 2px solid var(--blue);
-  border-block-start: 2px solid var(--blue);
-  transform: translateY(-50%) rotate(45deg);
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--panel);
+  border: 1px solid var(--line-solid);
+  color: var(--dim);
+}
+
+.glance-plane .icon {
+  width: 12px;
+  height: 12px;
 }
 
 .glance-duration {
@@ -562,6 +579,16 @@ details.card[open] > summary::after {
   .glance-altn { padding-inline-start: 0; border-inline-start: none; }
 }
 
+.icon {
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  flex: none;
+  vertical-align: -3px;
+}
+
 /* ------------------------------------------------------------------- tiles */
 
 .tiles {
@@ -578,6 +605,9 @@ details.card[open] > summary::after {
 }
 
 .tile .label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
   font-size: 10.5px;
   color: var(--dimmer);
   letter-spacing: 0.04em;
@@ -585,6 +615,10 @@ details.card[open] > summary::after {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.tile .label .icon {
+  opacity: 0.85;
 }
 
 .tile .value {
@@ -695,8 +729,24 @@ details.card[open] > summary::after {
 .cat-vfr { background: var(--green-bg); color: var(--green); }
 .cat-mvfr { background: var(--blue-bg); color: var(--blue); }
 .cat-ifr { background: var(--red-bg); color: var(--red); }
-.cat-lifr { background: var(--red); color: #fff; }
+.cat-lifr { background: rgba(169, 136, 255, 0.18); color: var(--violet); }
 .cat-unknown { background: var(--panel-3); color: var(--dim); }
+
+/* Compact status indicator -- the dot EFBs use in list rows, ahead of the
+   full-text category chip that appears in roomier headers. */
+.cat-dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  min-width: 9px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.chip .cat-dot {
+  margin-inline-end: 5px;
+  vertical-align: -1px;
+}
 
 /* ------------------------------------------------------------------ meters */
 
@@ -958,6 +1008,14 @@ details.card[open] > summary::after {
   flex-wrap: wrap;
   margin-block-end: 5px;
 }
+
+.notam .notam-icon {
+  display: inline-flex;
+  color: var(--dimmer);
+}
+
+.notam.sev-3 .notam-icon { color: var(--red); }
+.notam.sev-2 .notam-icon { color: var(--amber); }
 
 .notam .nid {
   font-family: var(--mono);

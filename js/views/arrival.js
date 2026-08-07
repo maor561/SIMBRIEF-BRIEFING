@@ -14,6 +14,8 @@ import {
   collapsible,
   tiles,
   chip,
+  icon,
+  categoryDot,
   runwayTable,
   chapterHeading,
   chapterFindings,
@@ -38,7 +40,7 @@ export default function renderArrival({ model, findings }) {
   };
 
   return `
-    ${chapterHeading(`${airport.icao} · ${airport.name || ''}`, t('arr.title'))}
+    ${chapterHeading(`${airport.icao} · ${airport.name || ''}`, t('arr.title'), categoryDot(airport.metarCategory))}
 
     <div class="grid">
       <div class="col-12">${flushCard({ headless: true, body: airportIdentity(airport) })}</div>
@@ -116,7 +118,7 @@ function alternateCard(model, alternate, window) {
     title: `${t('arr.alternate')} — ${alternate.icao} · ${alternate.name || ''}`,
     hint: t('arr.alternateHint'),
     badge: alternate.metarCategory
-      ? `<span class="chip ${categoryClass(alternate.metarCategory)}">${escapeHtml(alternate.metarCategory.toUpperCase())}</span>`
+      ? `<span class="chip ${categoryClass(alternate.metarCategory)}">${categoryDot(alternate.metarCategory)}${escapeHtml(alternate.metarCategory.toUpperCase())}</span>`
       : '',
     body,
     cls: 'accent-amber'

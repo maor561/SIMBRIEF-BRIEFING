@@ -12,6 +12,8 @@ import {
   tiles,
   meter,
   kv,
+  icon,
+  categoryDot,
   chapterHeading,
   chapterFindings,
   airportIdentity,
@@ -34,7 +36,7 @@ export default function renderDeparture({ model, findings }) {
   };
 
   return `
-    ${chapterHeading(`${airport.icao} · ${airport.name || ''}`, t('dep.title'))}
+    ${chapterHeading(`${airport.icao} · ${airport.name || ''}`, t('dep.title'), categoryDot(airport.metarCategory))}
 
     <div class="grid">
       <div class="col-12">${flushCard({ headless: true, body: flightGlanceBody(model) })}</div>
@@ -109,7 +111,7 @@ function flightGlanceBody(model) {
 
         <div class="glance-path">
           <span class="glance-level ltr">${cruiseAlt ? `FL${Math.round(cruiseAlt / 100)}` : '—'} · CI ${model.flight.costIndex ?? '—'}</span>
-          <span class="glance-line"></span>
+          <span class="glance-line"><span class="glance-plane">${icon('aircraft')}</span></span>
           <span class="glance-duration ltr">${fmtDuration(model.times.estTimeEnroute ?? model.times.estBlock)}</span>
         </div>
 
