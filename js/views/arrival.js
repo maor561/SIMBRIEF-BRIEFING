@@ -56,7 +56,7 @@ export default function renderArrival({ model, findings }) {
       </div>
 
       <div class="col-5">
-        ${flushCard({ title: t('wx.taf'), body: tafBlock(airport, eta) })}
+        ${collapsible({ title: t('wx.taf'), body: tafBlock(airport, eta) })}
       </div>
 
       <div class="col-7">

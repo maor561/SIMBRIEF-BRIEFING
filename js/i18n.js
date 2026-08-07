@@ -94,6 +94,7 @@ const STRINGS = {
     'notam.estimated': 'משוער',
     'notam.enroute': 'NOTAM בנתיב',
     'notam.enrouteNote': 'רק הודעות בחומרה גבוהה מה-FIRים שבמסלול',
+    'notam.showMore': 'הצג עוד',
 
     'dep.title': 'שדה המראה',
     'dep.glance': 'תמונת מצב',
@@ -330,6 +331,7 @@ const STRINGS = {
     'notam.estimated': 'estimated',
     'notam.enroute': 'Enroute NOTAMs',
     'notam.enrouteNote': 'High-severity items from FIRs along the route only',
+    'notam.showMore': 'Show more',
 
     'dep.title': 'Departure Airport',
     'dep.glance': 'Flight at a Glance',

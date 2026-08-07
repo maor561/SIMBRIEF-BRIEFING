@@ -72,7 +72,7 @@ export default function renderTakeoff({ model, findings }) {
       </div>
 
       <div class="col-7">
-        ${flushCard({ title: t('to.sid'), hint: model.route.sid || '', body: sidBody(model) })}
+        ${collapsible({ title: t('to.sid'), hint: model.route.sid || '', body: sidBody(model) })}
       </div>
 
       <div class="col-12">

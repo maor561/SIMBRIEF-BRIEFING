@@ -65,7 +65,7 @@ export default function renderCruise({ model, findings }) {
       </div>
 
       <div class="col-5">
-        ${flushCard({ title: t('crz.impacts'), hint: t('crz.impactsHint'), body: impactsTable(model) })}
+        ${collapsible({ title: t('crz.impacts'), hint: t('crz.impactsHint'), body: impactsTable(model) })}
       </div>
 
       <div class="col-12">
@@ -73,7 +73,7 @@ export default function renderCruise({ model, findings }) {
       </div>
 
       <div class="col-12">
-        ${flushCard({ title: t('common.route'), body: routeBody(model) })}
+        ${collapsible({ title: t('common.route'), body: routeBody(model) })}
       </div>
     </div>
   `;

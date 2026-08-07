@@ -426,6 +426,16 @@ details.card > summary::after {
   transition: transform 0.15s;
 }
 
+details.card > summary .hint {
+  font-size: 11px;
+  color: var(--dimmer);
+  font-weight: 400;
+}
+
+details.card > summary .grow {
+  flex: 1;
+}
+
 details.card[open] > summary {
   border-block-end-color: var(--line-solid);
 }
@@ -1043,6 +1053,41 @@ details.card[open] > summary::after {
   font-family: var(--mono);
   direction: ltr;
   unicode-bidi: isolate;
+}
+
+.notam-more > summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 13px;
+  cursor: pointer;
+  list-style: none;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--dim);
+  border-block-end: 1px solid transparent;
+}
+
+.notam-more[open] > summary {
+  border-block-end-color: var(--line-solid);
+}
+
+.notam-more > summary::-webkit-details-marker {
+  display: none;
+}
+
+.notam-more > summary::after {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-inline-end: 2px solid var(--dim);
+  border-block-end: 2px solid var(--dim);
+  transform: rotate(45deg);
+  transition: transform 0.15s;
+}
+
+.notam-more[open] > summary::after {
+  transform: rotate(-135deg);
 }
 
 .notam .schedule {

@@ -54,7 +54,7 @@ export default function renderDeparture({ model, findings }) {
       </div>
 
       <div class="col-7">
-        ${flushCard({ title: t('wx.taf'), hint: t('des.expectedAtEta'), body: tafBlock(airport, etd) })}
+        ${collapsible({ title: t('wx.taf'), hint: t('des.expectedAtEta'), body: tafBlock(airport, etd) })}
       </div>
 
       <div class="col-5">
@@ -66,7 +66,7 @@ export default function renderDeparture({ model, findings }) {
       </div>
 
       <div class="col-5">
-        ${flushCard({ title: t('dep.times'), body: timesBody(model) })}
+        ${collapsible({ title: t('dep.times'), body: timesBody(model) })}
       </div>
 
       <div class="col-12">${sigmetCard(model)}</div>
