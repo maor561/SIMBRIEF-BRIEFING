@@ -8,7 +8,6 @@ import { escapeHtml, fmtWeight, fmtDuration, fmtZulu, fmtNumber } from '../decod
 import {
   card,
   flushCard,
-  collapsible,
   tiles,
   meter,
   kv,
@@ -54,7 +53,7 @@ export default function renderDeparture({ model, findings }) {
       </div>
 
       <div class="col-7">
-        ${collapsible({ title: t('wx.taf'), hint: t('des.expectedAtEta'), body: tafBlock(airport, etd) })}
+        ${flushCard({ title: t('wx.taf'), hint: t('des.expectedAtEta'), body: tafBlock(airport, etd) })}
       </div>
 
       <div class="col-5">
@@ -66,7 +65,7 @@ export default function renderDeparture({ model, findings }) {
       </div>
 
       <div class="col-5">
-        ${collapsible({ title: t('dep.times'), body: timesBody(model) })}
+        ${flushCard({ title: t('dep.times'), body: timesBody(model) })}
       </div>
 
       <div class="col-12">${sigmetCard(model)}</div>
@@ -74,7 +73,7 @@ export default function renderDeparture({ model, findings }) {
       <div class="col-12">${atisBlock(airport)}</div>
 
       <div class="col-12">
-        ${collapsible({
+        ${flushCard({
           title: t('common.route'),
           body: routeBody(model)
         })}

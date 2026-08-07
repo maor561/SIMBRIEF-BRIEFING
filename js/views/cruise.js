@@ -22,7 +22,6 @@ import {
 import {
   card,
   flushCard,
-  collapsible,
   tiles,
   kv,
   chip,
@@ -65,7 +64,7 @@ export default function renderCruise({ model, findings }) {
       </div>
 
       <div class="col-5">
-        ${collapsible({ title: t('crz.impacts'), hint: t('crz.impactsHint'), body: impactsTable(model) })}
+        ${flushCard({ title: t('crz.impacts'), hint: t('crz.impactsHint'), body: impactsTable(model) })}
       </div>
 
       <div class="col-12">
@@ -73,7 +72,7 @@ export default function renderCruise({ model, findings }) {
       </div>
 
       <div class="col-12">
-        ${collapsible({ title: t('common.route'), body: routeBody(model) })}
+        ${flushCard({ title: t('common.route'), body: routeBody(model) })}
       </div>
     </div>
   `;
@@ -123,7 +122,7 @@ function enrouteNotamCard(model) {
   const live = relevant.filter(({ screen }) => screen.severity === 2);
 
   if (!relevant.length) {
-    return collapsible({
+    return flushCard({
       title: t('notam.enroute'),
       body: `<div class="empty-state">${escapeHtml(t('notam.empty'))}</div>`
     });
@@ -144,11 +143,10 @@ function enrouteNotamCard(model) {
     )
     .join('');
 
-  return collapsible({
+  return flushCard({
     title: `${t('notam.enroute')} — ${relevant.length} ${t('common.of')} ${model.enrouteNotams.length}`,
     badge: live.length ? chip(`${live.length} ${t('sev.warning')}`, 'amber') : '',
-    body: `<div class="img-note" style="padding:9px 13px">${escapeHtml(t('notam.enrouteNote'))}</div>${body}`,
-    open: live.length > 0
+    body: `<div class="img-note" style="padding:9px 13px">${escapeHtml(t('notam.enrouteNote'))}</div>${body}`
   });
 }
 

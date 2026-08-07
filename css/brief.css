@@ -339,30 +339,39 @@ button {
 }
 
 /*
- * Masonry via CSS multi-column rather than grid. A row-based grid sets each
- * row's height to its tallest card, so every shorter neighbour leaves dead
- * space below it -- that's the "gaps, no continuous flow" problem. Columns
- * let each card start immediately under the one above it in its own column,
- * the way a card wall actually packs. col-12 breaks the flow for a full-width
- * section; every narrower span (col-4..col-8) is now just "half" -- multicol
- * doesn't support fractional widths within a row, so the old fine-grained
- * 7/5 split collapses to a uniform column width. The column-width hint also
- * replaces the old breakpoints: the browser drops to one column on its own
- * once it can't fit two at that width, so portrait/mobile need no override.
+ * Masonry, measured in JS rather than approximated in CSS (see masonry.js).
+ * A row-based grid sets each row's height to its tallest card, leaving dead
+ * space under every shorter neighbour -- and CSS multi-column "solves" that
+ * by letting the browser guess column breaks, which is exactly what produced
+ * a phantom empty card-sized gap (a known multicol + break-inside interaction).
+ * Measuring real rendered heights and bin-packing removes the guesswork: no
+ * card is ever split, and no gap is ever bigger than the height difference
+ * between the two columns at that point.
+ *
+ * `.grid` itself is just a vertical stack; masonry.js groups the runs of
+ * non-full-width cards between each `.col-12` break into `.grid-row` >
+ * `.grid-col` pairs. On a screen too narrow for two columns it leaves
+ * everything in this single stack, which is why no portrait/mobile
+ * override is needed here.
  */
 .grid {
-  columns: 2 380px;
-  column-gap: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
-.grid > * {
-  break-inside: avoid;
-  width: 100%;
-  margin-block-end: 12px;
+.grid-row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
 }
 
-.col-12 {
-  column-span: all;
+.grid-col {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
 .card {
@@ -409,53 +418,6 @@ button {
 
 .card.accent-red { border-color: rgba(255, 92, 102, 0.5); }
 .card.accent-amber { border-color: rgba(255, 176, 46, 0.45); }
-
-/* collapsible */
-details.card > summary {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  padding: 10px 13px;
-  background: var(--panel-2);
-  border-block-end: 1px solid transparent;
-  cursor: pointer;
-  list-style: none;
-  font-size: 13px;
-  font-weight: 700;
-}
-
-details.card > summary::-webkit-details-marker {
-  display: none;
-}
-
-details.card > summary::after {
-  content: '';
-  margin-inline-start: auto;
-  width: 8px;
-  height: 8px;
-  border-inline-end: 2px solid var(--dim);
-  border-block-end: 2px solid var(--dim);
-  transform: rotate(45deg);
-  transition: transform 0.15s;
-}
-
-details.card > summary .hint {
-  font-size: 11px;
-  color: var(--dimmer);
-  font-weight: 400;
-}
-
-details.card > summary .grow {
-  flex: 1;
-}
-
-details.card[open] > summary {
-  border-block-end-color: var(--line-solid);
-}
-
-details.card[open] > summary::after {
-  transform: rotate(-135deg);
-}
 
 /* --------------------------------------------------------- flight glance */
 
@@ -1068,41 +1030,6 @@ details.card[open] > summary::after {
   unicode-bidi: isolate;
 }
 
-.notam-more > summary {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 10px 13px;
-  cursor: pointer;
-  list-style: none;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--dim);
-  border-block-end: 1px solid transparent;
-}
-
-.notam-more[open] > summary {
-  border-block-end-color: var(--line-solid);
-}
-
-.notam-more > summary::-webkit-details-marker {
-  display: none;
-}
-
-.notam-more > summary::after {
-  content: '';
-  width: 7px;
-  height: 7px;
-  border-inline-end: 2px solid var(--dim);
-  border-block-end: 2px solid var(--dim);
-  transform: rotate(45deg);
-  transition: transform 0.15s;
-}
-
-.notam-more[open] > summary::after {
-  transform: rotate(-135deg);
-}
-
 .notam .schedule {
   display: inline-block;
   margin-block-start: 5px;
@@ -1542,7 +1469,7 @@ table.rw-table tr.planned td:first-child {
   .app { display: block; height: auto; }
   .body { display: block; }
   .content { overflow: visible; padding: 0; }
-  .grid { columns: 1; }
+  .grid-row { flex-direction: column; }
   .card { break-inside: avoid; border-color: #bbb; }
   .card, .tile, .notam, .raw-wx, .taf-group { background: #fff !important; color: #000; }
   .tile .value, .finding .title { color: #000 !important; }

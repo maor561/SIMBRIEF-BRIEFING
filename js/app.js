@@ -7,7 +7,8 @@ import { t, setLang, toggleLang, getLang, applyDocumentLanguage } from './i18n.j
 import { normalizeOfp } from './normalize.js';
 import { analyze, countByChapter, SEVERITY } from './analyze.js';
 import { escapeHtml, fmtZulu, fmtDuration } from './decode.js';
-import { notamListMarkup, getNotamFilter } from './ui.js';
+import { getNotamFilter } from './ui.js';
+import { layoutMasonry } from './masonry.js';
 
 import renderDeparture from './views/departure.js';
 import renderTakeoff from './views/takeoff.js';
@@ -167,10 +168,17 @@ function renderRail() {
   }).join('');
 }
 
-function renderChapter() {
+function renderChapter({ preserveScroll = false } = {}) {
   const chapter = CHAPTERS.find((c) => c.id === state.chapter) || CHAPTERS[0];
+  const scrollTop = preserveScroll ? el.content.scrollTop : 0;
   el.content.innerHTML = chapter.render({ model: state.model, findings: state.findings });
-  el.content.scrollTop = 0;
+  // Masonry moves card nodes into freshly built row/column wrappers, so it
+  // must run on the flat list renderChapter just produced -- calling it
+  // again on an already-laid-out tree would nest wrappers instead of
+  // rebalancing them. Any change that affects a card's height (like the
+  // NOTAM filter below) goes through a full renderChapter, not a DOM patch.
+  layoutMasonry(el.content);
+  el.content.scrollTop = scrollTop;
   localStorage.setItem(STORAGE_CHAPTER, state.chapter);
 }
 
@@ -268,23 +276,12 @@ document.addEventListener('change', (event) => {
   const filter = getNotamFilter(icao);
   filter[key] = input.checked;
 
-  const airport = findAirport(icao);
-  const list = document.querySelector(`[data-notam-list][data-icao="${icao}"]`);
-  if (airport && list) list.innerHTML = notamListMarkup(airport, flightWindow());
+  // A patched-in-place list would change that card's height without the
+  // masonry columns around it knowing, so this goes through a full chapter
+  // refresh instead -- scroll position is preserved so toggling a checkbox
+  // doesn't jump the reader back to the top of the page.
+  renderChapter({ preserveScroll: true });
 });
-
-function findAirport(icao) {
-  const m = state.model;
-  return [m.origin, m.destination, ...m.alternates].find((a) => a?.icao === icao) || null;
-}
-
-export function flightWindow() {
-  const m = state.model;
-  return {
-    start: m.times.estOut || m.times.schedOut,
-    end: m.times.estIn || m.times.schedIn
-  };
-}
 
 /* Swipe between chapters. Ignores gestures that start on a scrollable chart. */
 let touchStart = null;
@@ -326,6 +323,16 @@ setInterval(() => {
   const clock = document.getElementById('clock');
   if (clock) clock.textContent = fmtZulu(new Date());
 }, 10000);
+
+// Rotating the iPad (or resizing a dev window) can cross the two-column
+// threshold; re-run the full chapter render so masonry rebalances from a
+// flat list rather than re-packing its own already-built row/column tree.
+let resizeTimer = null;
+addEventListener('resize', () => {
+  if (el.app.hidden) return;
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => renderChapter({ preserveScroll: true }), 150);
+});
 
 /* -------------------------------------------------------------------- boot */
 

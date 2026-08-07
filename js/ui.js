@@ -54,7 +54,6 @@ const ICON_PATHS = {
   visibility: 'M2 12S6 5 12 5s10 7 10 7-4 7-10 7-10-7-10-7zM12 9.4a2.6 2.6 0 1 0 0 5.2 2.6 2.6 0 0 0 0-5.2z',
   ceiling: 'M7.5 18a4.2 4.2 0 0 1-.7-8.34 5.3 5.3 0 0 1 10.2-1.9A4.3 4.3 0 0 1 16.8 18H7.5z',
   temperature: 'M13 14.76V5a1.8 1.8 0 1 0-3.6 0v9.76a4 4 0 1 0 3.6 0z',
-  clock: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 7v5l3.2 1.9',
   runway: 'M3 9h18M3 15h18M9 12h2M13 12h2',
   taxiway: 'M3 13c4.5 0 4.5-6.5 9-6.5S16.5 13 21 13',
   lighting: 'M9.3 18h5.4M10.2 20.7h3.6M8.2 13.6A3.8 3.8 0 1 1 15.8 13.6c0 1.7-.9 2.5-1.4 3.1-.3.4-.5.7-.5 1.5H9.9c0-.8-.1-1.1-.4-1.5-.5-.6-1.3-1.4-1.3-3.1z',
@@ -92,18 +91,6 @@ export function card({ title, hint, badge, body, cls = '', headless = false }) {
 /** A card whose body sits flush against the edges (tables, lists, charts). */
 export function flushCard(opts) {
   return card({ ...opts, cls: `flush ${opts.cls || ''}` });
-}
-
-export function collapsible({ title, hint, badge, body, open = false, cls = '' }) {
-  return `<details class="card ${cls}" ${open ? 'open' : ''}>
-    <summary>
-      <span class="s-title">${escapeHtml(title)}</span>
-      ${hint ? `<span class="hint">${escapeHtml(hint)}</span>` : ''}
-      <span class="grow"></span>
-      ${badge || ''}
-    </summary>
-    <div class="body">${body}</div>
-  </details>`;
 }
 
 /* ------------------------------------------------------------------- tiles */
@@ -347,10 +334,10 @@ export function atisBlock(airport) {
   if (!airport?.atis?.length) return '';
   // Multiple networks may publish; the last entry is the freshest.
   const latest = airport.atis[airport.atis.length - 1];
-  return collapsible({
+  return flushCard({
     title: `${t('wx.atis')}${latest.letter ? ` — ${latest.letter}` : ''}`,
     badge: latest.source ? chip(latest.source) : '',
-    body: `<div class="raw-wx">${escapeHtml(latest.text)}</div>`
+    body: `<div class="raw-wx" style="margin:13px">${escapeHtml(latest.text)}</div>`
   });
 }
 
@@ -387,40 +374,26 @@ export function notamListMarkup(airport, window) {
     return `<div class="empty-state">${escapeHtml(t('notam.empty'))}</div>`;
   }
 
-  // Beyond the top few, a long list reads as noise rather than signal --
-  // everything is still sorted by severity, so tucking the tail behind a
-  // fold loses nothing a crew would reach for first.
-  const FOLD_AT = 5;
-  const visible = ranked.slice(0, FOLD_AT);
-  const rest = ranked.slice(FOLD_AT);
+  return ranked
+    .map(({ notam, severity }) => {
+      const body = notam.html ? sanitizeNotamHtml(notam.html) : escapeHtml(notam.text || notam.raw || '');
+      const from = notam.effective ? fmtZuluDate(new Date(notam.effective)) : null;
+      const to = notam.expires ? fmtZuluDate(new Date(notam.expires)) : null;
 
-  const article = ({ notam, severity }) => {
-    const body = notam.html ? sanitizeNotamHtml(notam.html) : escapeHtml(notam.text || notam.raw || '');
-    const from = notam.effective ? fmtZuluDate(new Date(notam.effective)) : null;
-    const to = notam.expires ? fmtZuluDate(new Date(notam.expires)) : null;
-
-    return `<article class="notam sev-${severity}">
-      <div class="top">
-        <span class="notam-icon">${icon(notamIconName(notam), { size: 15 })}</span>
-        <span class="nid">${escapeHtml(notam.id || '')}</span>
-        ${notam.subject ? chip(notam.subject, severity === 3 ? 'red' : severity === 2 ? 'amber' : '') : ''}
-        ${notam.status ? chip(notam.status) : ''}
-        ${notam.isObstacle ? chip('OBST') : ''}
-      </div>
-      <div class="text">${body}</div>
-      ${notam.schedule ? `<div class="schedule">${escapeHtml(notam.schedule)}</div>` : ''}
-      ${from || to ? `<div class="when">${from ? `${t('notam.effective')} ${from}` : ''}${to ? `  ·  ${t('notam.expires')} ${to}${notam.expiryEstimated ? ` (${t('notam.estimated')})` : ''}` : ''}</div>` : ''}
-    </article>`;
-  };
-
-  const foldedRest = rest.length
-    ? `<details class="notam-more">
-         <summary>${escapeHtml(t('notam.showMore'))} (${rest.length})</summary>
-         ${rest.map(article).join('')}
-       </details>`
-    : '';
-
-  return visible.map(article).join('') + foldedRest;
+      return `<article class="notam sev-${severity}">
+        <div class="top">
+          <span class="notam-icon">${icon(notamIconName(notam), { size: 15 })}</span>
+          <span class="nid">${escapeHtml(notam.id || '')}</span>
+          ${notam.subject ? chip(notam.subject, severity === 3 ? 'red' : severity === 2 ? 'amber' : '') : ''}
+          ${notam.status ? chip(notam.status) : ''}
+          ${notam.isObstacle ? chip('OBST') : ''}
+        </div>
+        <div class="text">${body}</div>
+        ${notam.schedule ? `<div class="schedule">${escapeHtml(notam.schedule)}</div>` : ''}
+        ${from || to ? `<div class="when">${from ? `${t('notam.effective')} ${from}` : ''}${to ? `  ·  ${t('notam.expires')} ${to}${notam.expiryEstimated ? ` (${t('notam.estimated')})` : ''}` : ''}</div>` : ''}
+      </article>`;
+    })
+    .join('');
 }
 
 export function notamCard(airport, window) {

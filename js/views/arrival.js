@@ -11,7 +11,6 @@ import { escapeHtml, fmtNumber, fmtFeet, fmtWeight, fmtDuration, fmtZulu } from 
 import {
   card,
   flushCard,
-  collapsible,
   tiles,
   chip,
   icon,
@@ -56,7 +55,7 @@ export default function renderArrival({ model, findings }) {
       </div>
 
       <div class="col-5">
-        ${collapsible({ title: t('wx.taf'), body: tafBlock(airport, eta) })}
+        ${flushCard({ title: t('wx.taf'), body: tafBlock(airport, eta) })}
       </div>
 
       <div class="col-7">
@@ -70,7 +69,7 @@ export default function renderArrival({ model, findings }) {
         .join('')}
 
       <div class="col-12">
-        ${collapsible({ title: t('to.otherRunways'), body: runwayTable(model.tlr.landing, { landing: true }) })}
+        ${flushCard({ title: t('to.otherRunways'), body: runwayTable(model.tlr.landing, { landing: true }) })}
       </div>
     </div>
   `;

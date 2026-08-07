@@ -15,7 +15,6 @@ import {
 import {
   card,
   flushCard,
-  collapsible,
   tiles,
   kv,
   chip,
@@ -72,11 +71,11 @@ export default function renderTakeoff({ model, findings }) {
       </div>
 
       <div class="col-7">
-        ${collapsible({ title: t('to.sid'), hint: model.route.sid || '', body: sidBody(model) })}
+        ${flushCard({ title: t('to.sid'), hint: model.route.sid || '', body: sidBody(model) })}
       </div>
 
       <div class="col-12">
-        ${collapsible({
+        ${flushCard({
           title: `${t('to.otherRunways')} (${others.length})`,
           body: runwayTable(tlr)
         })}

@@ -11,7 +11,6 @@ import { escapeHtml, fmtNumber, fmtFeet, fmtWeight, fmtDuration, fmtZulu, windCo
 import {
   card,
   flushCard,
-  collapsible,
   tiles,
   kv,
   chip,
@@ -45,7 +44,7 @@ export default function renderDescent({ model, findings }) {
       </div>
 
       <div class="col-7">
-        ${collapsible({ title: joinParts([t('des.star'), model.route.star], ' — '), body: starBody(model) })}
+        ${flushCard({ title: joinParts([t('des.star'), model.route.star], ' — '), body: starBody(model) })}
       </div>
 
       <div class="col-5">
@@ -57,7 +56,7 @@ export default function renderDescent({ model, findings }) {
       </div>
 
       <div class="col-6">
-        ${collapsible({
+        ${flushCard({
           title: `${t('wx.taf')} — ${destination?.icao || ''}`,
           hint: eta ? `${t('des.expectedAtEta')} ${fmtZulu(eta)}` : '',
           body: tafBlock(destination, eta)
@@ -69,7 +68,7 @@ export default function renderDescent({ model, findings }) {
       </div>
 
       <div class="col-5">
-        ${collapsible({ title: t('des.terrain'), body: terrainBody(model) })}
+        ${flushCard({ title: t('des.terrain'), body: terrainBody(model) })}
       </div>
     </div>
   `;
