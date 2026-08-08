@@ -1,5 +1,5 @@
 /**
- * Chapter 3 — Cruise.
+ * The heavy route visualisations, shared by the type-based chapters.
  *
  * Centrepiece is the route weather strip: one horizontal axis of navlog fixes
  * with altitude/terrain, wind component, ISA deviation and shear stacked as
@@ -8,7 +8,7 @@
  * point on the route".
  */
 
-import { t } from '../i18n.js';
+import { t } from './i18n.js';
 import {
   escapeHtml,
   fmtNumber,
@@ -18,80 +18,9 @@ import {
   screenEnrouteNotam,
   notamActiveDuring,
   notamIconName
-} from '../decode.js';
-import {
-  card,
-  flushCard,
-  tiles,
-  kv,
-  chip,
-  icon,
-  chapterHeading,
-  chapterFindings,
-  joinParts
-} from '../ui.js';
-import { THRESHOLDS } from '../analyze.js';
-
-export default function renderCruise({ model, findings }) {
-  return `
-    ${chapterHeading(t('crz.title'), joinParts([model.flight.cruiseProfile, model.flight.cruiseMach]))}
-
-    <div class="grid">
-      ${findings.some((f) => f.chapter === 'cruise') ? `<div class="col-12">${chapterFindings(findings, 'cruise')}</div>` : ''}
-
-      <div class="col-12">
-        ${flushCard({
-          title: t('crz.wxStrip'),
-          hint: t('crz.wxStripHint'),
-          body: `${weatherStrip(model)}<div style="padding:0 13px 13px"><div data-fix-detail>${buildFixDetail(defaultFix(model), model)}</div></div>`
-        })}
-      </div>
-
-      <div class="col-12">
-        ${flushCard({ title: t('crz.stepClimb'), body: stepLadder(model) })}
-      </div>
-
-      <div class="col-7">
-        ${flushCard({ title: t('crz.charts'), body: chartsBody(model) })}
-      </div>
-
-      <div class="col-5">
-        ${card({ title: t('crz.title'), body: cruiseFactsBody(model) })}
-      </div>
-
-      <div class="col-7">
-        ${flushCard({ title: t('crz.fuelCurve'), hint: t('crz.tightest'), body: fuelCurve(model) })}
-      </div>
-
-      <div class="col-5">
-        ${flushCard({ title: t('crz.impacts'), hint: t('crz.impactsHint'), body: impactsTable(model) })}
-      </div>
-
-      <div class="col-12">
-        ${enrouteNotamCard(model)}
-      </div>
-
-      <div class="col-12">
-        ${flushCard({ title: t('common.route'), body: routeBody(model) })}
-      </div>
-    </div>
-  `;
-}
-
-function routeBody(model) {
-  const route = model.route;
-  return `
-    ${tiles([
-      { label: t('common.distance'), value: fmtNumber(route.distance), unit: 'nm', size: 'big' },
-      { label: t('sum.airDistance'), value: fmtNumber(route.airDistance), unit: 'nm' }
-    ])}
-    <div style="padding:0 13px 13px">
-      ${route.firs.length ? `<div style="display:flex;gap:7px;flex-wrap:wrap;margin-block-end:9px">${route.firs.map((fir) => chip(fir, 'blue')).join('')}</div>` : ''}
-      <div class="raw-wx">${escapeHtml(route.text || '')}</div>
-      ${route.section18 ? `<div class="raw-wx" style="margin-block-start:9px">${escapeHtml(route.section18)}</div>` : ''}
-    </div>
-  `;
-}
+} from './decode.js';
+import { flushCard, tiles, kv, chip, icon } from './ui.js';
+import { THRESHOLDS } from './analyze.js';
 
 /**
  * Enroute NOTAMs, cut down to something readable.
@@ -101,7 +30,7 @@ function routeBody(model) {
  * the cruise. What is left is airspace and activity: restricted areas, military
  * exercises, firing, UAV operations.
  */
-function enrouteNotamCard(model) {
+export function enrouteNotams(model) {
   const routeFirs = new Set([
     ...model.route.firs,
     ...model.navlog.map((f) => f.fir).filter(Boolean)
@@ -119,13 +48,10 @@ function enrouteNotamCard(model) {
     .filter(({ screen }) => screen.keep)
     .sort((a, b) => b.screen.severity - a.screen.severity);
 
-  const live = relevant.filter(({ screen }) => screen.severity === 2);
+  const live = relevant.filter(({ screen }) => screen.severity === 2).length;
 
   if (!relevant.length) {
-    return flushCard({
-      title: t('notam.enroute'),
-      body: `<div class="empty-state">${escapeHtml(t('notam.empty'))}</div>`
-    });
+    return { kept: 0, total: model.enrouteNotams.length, live: 0, body: `<div class="empty-state">${escapeHtml(t('notam.empty'))}</div>` };
   }
 
   const body = relevant
@@ -143,11 +69,12 @@ function enrouteNotamCard(model) {
     )
     .join('');
 
-  return flushCard({
-    title: `${t('notam.enroute')} — ${relevant.length} ${t('common.of')} ${model.enrouteNotams.length}`,
-    badge: live.length ? chip(`${live.length} ${t('sev.warning')}`, 'amber') : '',
-    body: `<div class="img-note" style="padding:9px 13px">${escapeHtml(t('notam.enrouteNote'))}</div>${body}`
-  });
+  return {
+    kept: relevant.length,
+    total: model.enrouteNotams.length,
+    live,
+    body: `<div class="img-note" style="padding:11px 15px">${escapeHtml(t('notam.enrouteNote'))}</div>${body}`
+  };
 }
 
 /** The E) field carries the message; the rest of the raw NOTAM is envelope. */
@@ -179,7 +106,7 @@ function anomaliesFor(fix, previous) {
   return reasons;
 }
 
-function defaultFix(model) {
+export function defaultFix(model) {
   // Open on the first flagged fix, so the interesting point is already shown.
   for (let i = 0; i < model.navlog.length; i += 1) {
     if (anomaliesFor(model.navlog[i], model.navlog[i - 1]).length) return model.navlog[i];
@@ -187,7 +114,7 @@ function defaultFix(model) {
   return model.topOfClimb || model.navlog[0];
 }
 
-function weatherStrip(model) {
+export function weatherStrip(model) {
   const fixes = model.navlog;
   if (!fixes.length) return `<div class="empty-state">${escapeHtml(t('common.notAvailable'))}</div>`;
 
@@ -368,7 +295,7 @@ export function buildFixDetail(fix, model) {
 
 /* ------------------------------------------------------------- step ladder */
 
-function stepLadder(model) {
+export function stepLadder(model) {
   const steps = model.flight.stepClimb;
   if (!steps.length) return `<div class="empty-state">${escapeHtml(t('common.none'))}</div>`;
 
@@ -386,7 +313,7 @@ function stepLadder(model) {
 
 /* ----------------------------------------------------------------- charts */
 
-function chartsBody(model) {
+export function chartsBody(model) {
   const images = model.images;
   const options = [];
 
@@ -451,7 +378,7 @@ export function dominantCruiseAltitude(model) {
 
 /* ------------------------------------------------------------- fuel curve */
 
-function fuelCurve(model) {
+export function fuelCurve(model) {
   const fixes = model.navlog.filter((f) => Number.isFinite(f.fuelOnBoard) && Number.isFinite(f.fuelMinOnBoard));
   if (fixes.length < 2) return `<div class="empty-state">${escapeHtml(t('common.notAvailable'))}</div>`;
 
@@ -512,7 +439,7 @@ function fuelCurve(model) {
 
 /* ---------------------------------------------------------------- impacts */
 
-function impactsTable(model) {
+export function impactsTable(model) {
   const rows = [
     ['−6000 ft', model.impacts.minus6000],
     ['−4000 ft', model.impacts.minus4000],
@@ -559,7 +486,7 @@ function impactsTable(model) {
 
 /* ------------------------------------------------------------------ facts */
 
-function cruiseFactsBody(model) {
+export function cruiseFactsBody(model) {
   const f = model.flight;
   const avgComponent = f.avgWindComponent;
 

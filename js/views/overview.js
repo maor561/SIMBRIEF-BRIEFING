@@ -12,8 +12,8 @@
 
 import { t } from '../i18n.js';
 import { escapeHtml, fmtNumber, fmtDuration, fmtZulu } from '../decode.js';
-import { icon, section } from '../ui.js';
-import { dominantCruiseAltitude } from './cruise.js';
+import { icon, section, findingsList } from '../ui.js';
+import { dominantCruiseAltitude } from '../charts.js';
 import { SEVERITY } from '../analyze.js';
 
 export default function renderOverview({ model, findings }) {
@@ -28,6 +28,13 @@ export default function renderOverview({ model, findings }) {
   return `
     <div class="cover">
       ${section(t('ov.schedule'), 'clock', scheduleBand(model), { action: watch })}
+      ${
+        findings.length
+          ? section(t('sum.watchItems'), 'obstacle', findingsList(findings, { showChapter: true }), {
+              cls: critical ? 'accent-red' : 'accent-amber'
+            })
+          : ''
+      }
       ${section(t('ov.dispatch'), 'headset', dispatchBody(model))}
       ${section(t('common.route'), 'routeSwap', routeBody(model))}
     </div>

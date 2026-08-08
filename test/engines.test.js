@@ -289,7 +289,7 @@ check('catches the 44 kg ZFW margin', () => {
   assert.ok(zfw, 'expected a ZFW finding');
   assert.equal(model.weights.maxZfw - model.weights.estZfw, 44);
   assert.equal(zfw.severity, SEVERITY.CRITICAL, 'a 44 kg margin is critical');
-  assert.equal(zfw.chapter, 'departure');
+  assert.equal(zfw.chapter, 'fuel');
 });
 
 check('flags high shear points on the route', () => {
@@ -298,7 +298,7 @@ check('flags high shear points on the route', () => {
   assert.equal(shearFindings.length, shearFixes.length);
   for (const f of shearFindings) {
     assert.ok(f.ident, 'shear finding names its fix');
-    assert.equal(f.chapter, 'cruise');
+    assert.equal(f.chapter, 'weather');
   }
 });
 
@@ -340,7 +340,7 @@ check('every finding is well formed', () => {
   for (const f of findings) {
     assert.ok([1, 2, 3].includes(f.severity), `bad severity: ${f.severity}`);
     assert.ok(
-      ['departure', 'takeoff', 'cruise', 'descent', 'arrival'].includes(f.chapter),
+      ['weather', 'notams', 'fuel', 'performance', 'navlog'].includes(f.chapter),
       `bad chapter: ${f.chapter}`
     );
     assert.ok(f.title && f.title.he && f.title.en, 'finding needs a bilingual title');

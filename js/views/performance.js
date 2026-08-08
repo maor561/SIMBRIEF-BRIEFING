@@ -1,6 +1,9 @@
 /**
- * Chapter 2 — Takeoff.
- * The numbers needed on the runway, with the planned runway front and centre.
+ * Performance.
+ *
+ * The takeoff and landing runway analysis SimBrief ships as TLR: the planned
+ * runway in full, then every runway it evaluated so a late change has numbers
+ * ready.
  */
 
 import { t } from '../i18n.js';
@@ -13,8 +16,7 @@ import {
   decodeSurface
 } from '../decode.js';
 import {
-  card,
-  flushCard,
+  section,
   tiles,
   kv,
   chip,
@@ -22,89 +24,71 @@ import {
   windRose,
   runwayBar,
   runwayTable,
-  fixList,
-  chapterHeading,
-  chapterFindings,
-  joinParts
+  landingPerformanceBody
 } from '../ui.js';
 import { THRESHOLDS } from '../analyze.js';
 
-export default function renderTakeoff({ model, findings }) {
-  const tlr = model.tlr.takeoff;
-  const airport = model.origin;
+export default function renderPerformance({ model }) {
+  const takeoff = model.tlr.takeoff;
+  const landing = model.tlr.landing;
 
-  if (!tlr) {
-    return `
-      ${chapterHeading(t('to.title'), airport?.icao || '')}
-      ${chapterFindings(findings, 'takeoff')}
-      ${card({ title: t('to.perfFor'), body: `<div class="empty-state">${escapeHtml(t('common.notAvailable'))}</div>` })}
-      ${departureRouteCard(model)}
-    `;
-  }
-
-  const planned = tlr.runways.find((r) => r.identifier === tlr.plannedRunway) || tlr.runways[0];
-  const others = tlr.runways.filter((r) => r !== planned);
+  const takeoffRunway = takeoff?.runways.find((r) => r.identifier === takeoff.plannedRunway) || takeoff?.runways[0];
 
   return `
-    ${chapterHeading(
-      joinParts([t('to.title'), tlr.airport || airport?.icao]),
-      joinParts([t('common.runway'), tlr.plannedRunway], ' ')
-    )}
+    <div class="cover">
+      ${section(
+        `${t('to.perfFor')}${takeoffRunway ? ` — ${takeoffRunway.identifier}` : ''}`,
+        'aircraft',
+        takeoff ? takeoffBody(model, takeoff, takeoffRunway) : notAvailable(),
+        {
+          action: takeoffRunway?.limitCode
+            ? `<span class="sect-flag warn">${escapeHtml(t('to.limitedBy'))}: ${escapeHtml(decodeLimitCode(takeoffRunway.limitCode))}</span>`
+            : ''
+        }
+      )}
 
-    <div class="grid">
-      ${findings.some((f) => f.chapter === 'takeoff') ? `<div class="col-12">${chapterFindings(findings, 'takeoff')}</div>` : ''}
+      ${section(t('to.conditions'), 'wind', takeoff ? conditionsBody(takeoff, takeoffRunway) : notAvailable())}
 
-      <div class="col-7">
-        ${flushCard({
-          title: `${t('to.perfFor')} — ${planned?.identifier || ''}`,
-          badge: planned?.limitCode ? chip(`${t('to.limitedBy')}: ${decodeLimitCode(planned.limitCode)}`, 'amber') : '',
-          body: plannedRunwayBody(model, tlr, planned)
-        })}
-      </div>
+      ${section(t('to.config'), 'info', takeoff ? configBody(model, takeoff, takeoffRunway) : notAvailable())}
 
-      <div class="col-5">
-        ${card({ title: t('to.conditions'), body: conditionsBody(tlr, planned) })}
-      </div>
+      ${section(
+        `${t('to.otherRunways')} — ${t('nav.takeoff')}`,
+        'runway',
+        takeoff ? runwayTable(takeoff) : notAvailable()
+      )}
 
-      <div class="col-5">
-        ${card({ title: t('to.config'), body: configBody(model, tlr, planned) })}
-      </div>
+      ${section(t('arr.landingPerf'), 'aircraft', landingPerformanceBody(model))}
 
-      <div class="col-7">
-        ${flushCard({ title: t('to.sid'), hint: model.route.sid || '', body: sidBody(model) })}
-      </div>
-
-      <div class="col-12">
-        ${flushCard({
-          title: `${t('to.otherRunways')} (${others.length})`,
-          body: runwayTable(tlr)
-        })}
-      </div>
+      ${section(
+        `${t('to.otherRunways')} — ${t('nav.arrival')}`,
+        'runway',
+        landing ? runwayTable(landing, { landing: true }) : notAvailable()
+      )}
     </div>
   `;
 }
 
+function notAvailable() {
+  return `<div class="empty-state">${escapeHtml(t('common.notAvailable'))}</div>`;
+}
+
 /* The headline card: speeds, then the runway drawn to scale. */
-function plannedRunwayBody(model, tlr, runway) {
-  if (!runway) return `<div class="empty-state">${escapeHtml(t('common.notAvailable'))}</div>`;
+function takeoffBody(model, tlr, runway) {
+  if (!runway) return notAvailable();
 
   const units = model.units;
   const hasSpeeds = runway.v1 || runway.vr || runway.v2;
 
   return `
     ${tiles([
-      { label: 'V1', value: runway.v1 ?? '—', size: 'huge', tone: runway.v1 ? '' : '' },
+      { label: 'V1', value: runway.v1 ?? '—', size: 'huge' },
       { label: 'VR', value: runway.vr ?? '—', size: 'huge' },
       { label: 'V2', value: runway.v2 ?? '—', size: 'huge' },
       runway.vref ? { label: runway.vrefId || 'VREF', value: runway.vref, size: 'big', tone: 'info' } : null
     ])}
-    ${
-      hasSpeeds
-        ? ''
-        : `<div class="img-note" style="padding:9px 13px 0">${escapeHtml(t('common.notAvailable'))} — V-speeds</div>`
-    }
+    ${hasSpeeds ? '' : `<div class="img-note" style="padding:9px 15px 0">${escapeHtml(t('common.notAvailable'))} — V-speeds</div>`}
 
-    <div style="padding:13px">
+    <div class="sect-pad">
       ${runwayBar(runway)}
       ${kv([
         [t('to.decide'), runway.distanceDecide ? fmtFeet(runway.distanceDecide) : '—'],
@@ -114,7 +98,7 @@ function plannedRunwayBody(model, tlr, runway) {
       ])}
     </div>
 
-    <div style="padding:0 13px 13px">
+    <div class="sect-pad" style="padding-block-start:0">
       ${meter({
         label: t('to.weightLimit'),
         value: tlr.plannedWeight,
@@ -123,9 +107,6 @@ function plannedRunwayBody(model, tlr, runway) {
         warnBelow: 500,
         badBelow: 0
       })}
-    </div>
-
-    <div style="padding:0 13px 13px">
       ${kv([
         ['TORA', runway.tora ? fmtFeet(runway.tora) : '—'],
         ['TODA', runway.toda ? fmtFeet(runway.toda) : '—'],
@@ -158,11 +139,13 @@ function conditionsBody(tlr, runway) {
     : 'good';
 
   return `
-    <div style="display:flex;gap:13px;align-items:center;margin-block-end:11px">
-      ${windRose(tlr.windDir, tlr.windSpd, runway?.magneticCourse)}
-      <div>
-        <div class="num" style="font-size:20px;font-weight:700">${tlr.windDir ?? '—'}° / ${tlr.windSpd ?? '—'} kt</div>
-        <div style="font-size:11.5px;color:var(--dimmer)">${escapeHtml(t('common.wind'))}</div>
+    <div class="sect-pad">
+      <div style="display:flex;gap:14px;align-items:center;margin-block-end:12px">
+        ${windRose(tlr.windDir, tlr.windSpd, runway?.magneticCourse)}
+        <div>
+          <div class="num" style="font-size:20px;font-weight:700">${tlr.windDir ?? '—'}° / ${tlr.windSpd ?? '—'} kt</div>
+          <div style="font-size:11.5px;color:var(--dimmer)">${escapeHtml(t('common.wind'))}</div>
+        </div>
       </div>
     </div>
 
@@ -183,7 +166,7 @@ function conditionsBody(tlr, runway) {
       }
     ])}
 
-    <div style="padding-block-start:11px">
+    <div class="sect-pad">
       ${kv([
         [t('common.temp'), tlr.temperature === null ? '—' : `${tlr.temperature}°C`],
         [t('common.qnh'), tlr.altimeter === null ? '—' : `${tlr.altimeter} inHg`],
@@ -195,7 +178,7 @@ function conditionsBody(tlr, runway) {
 }
 
 function configBody(model, tlr, runway) {
-  return kv([
+  return `<div class="sect-pad">${kv([
     [t('to.flap'), runway?.flap || tlr.flap || '—'],
     [t('to.thrust'), runway?.thrust || '—'],
     [t('to.bleeds'), runway?.bleed || '—'],
@@ -204,29 +187,5 @@ function configBody(model, tlr, runway) {
     [t('to.climbProfile'), model.flight.climbProfile || '—'],
     [t('to.initialAlt'), model.flight.initialAltitude ? fmtFeet(model.flight.initialAltitude) : '—'],
     [t('common.transAlt'), model.origin?.transAlt ? fmtFeet(model.origin.transAlt) : '—']
-  ]);
-}
-
-/* Departure fixes, plus the highest terrain figure in the climb. */
-function sidBody(model) {
-  const climb = model.phases.climb;
-  const sidFixes = climb.filter((f) => f.isSidStar);
-  const shown = (sidFixes.length ? sidFixes : climb).slice(0, 8);
-  const maxMora = climb.reduce((max, f) => (Number.isFinite(f.mora) && f.mora > max ? f.mora : max), 0);
-
-  return `
-    ${fixList(shown)}
-    ${
-      maxMora
-        ? `<div class="row" style="background:var(--panel-2)">
-             <span class="grow">${escapeHtml(t('crz.layer.terrain'))}</span>
-             <span class="val">${fmtFeet(maxMora)}</span>
-           </div>`
-        : ''
-    }
-  `;
-}
-
-function departureRouteCard(model) {
-  return flushCard({ title: t('to.sid'), body: fixList(model.phases.climb.slice(0, 8)) });
+  ])}</div>`;
 }

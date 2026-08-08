@@ -59,7 +59,7 @@ function checkRouteWeather(model, findings) {
       findings.push(
         finding(
           fix.shear >= THRESHOLDS.shear * 1.5 ? SEVERITY.CRITICAL : SEVERITY.WARNING,
-          'cruise',
+          'weather',
           bilingual(`גזירת רוח ב-${fix.ident}`, `Wind shear at ${fix.ident}`),
           bilingual(
             `ערך shear ${fix.shear} בגובה ${fmtFeet(fix.altitude)} — צפויה טלטלה. רוח ${fix.windDir}°/${fix.windSpd}kt.`,
@@ -84,7 +84,7 @@ function checkRouteWeather(model, findings) {
       findings.push(
         finding(
           SEVERITY.WARNING,
-          'cruise',
+          'weather',
           bilingual(`שינוי חד ברוח בין ${prev.ident} ל-${curr.ident}`, `Sharp wind change ${prev.ident} to ${curr.ident}`),
           bilingual(
             `רכיב הרוח משתנה ב-${Math.abs(delta)}kt (${prev.windComponent} ← ${curr.windComponent}). צפה לשינוי במהירות קרקע ובצריכת דלק.`,
@@ -105,7 +105,7 @@ function checkRouteWeather(model, findings) {
     findings.push(
       finding(
         SEVERITY.INFO,
-        'cruise',
+        'weather',
         bilingual(`תבליט גבוה סביב ${highestMora.ident}`, `High terrain near ${highestMora.ident}`),
         bilingual(
           `MORA ${fmtFeet(highestMora.mora)} — רלוונטי לגובה החזרה במקרה של ירידת לחץ או כיבוי מנוע.`,
@@ -141,7 +141,7 @@ function reportIsaDeviation(fixes, findings) {
       findings.push(
         finding(
           SEVERITY.WARNING,
-          'cruise',
+          'weather',
           bilingual(`סטיית ISA חריגה ב-${fix.ident}`, `Large ISA deviation at ${fix.ident}`),
           bilingual(
             `ISA ${fixSign}${Math.abs(fix.isaDev)}°C בגובה ${fmtFeet(fix.altitude)}. משפיע על ביצועי טיפוס ותקרה.`,
@@ -157,7 +157,7 @@ function reportIsaDeviation(fixes, findings) {
   findings.push(
     finding(
       SEVERITY.WARNING,
-      'cruise',
+      'weather',
       bilingual(
         `אוויר ${worst.isaDev > 0 ? 'חם' : 'קר'} מהתקן לאורך רוב המסלול`,
         `Air ${worst.isaDev > 0 ? 'warmer' : 'colder'} than standard along most of the route`
@@ -173,9 +173,9 @@ function reportIsaDeviation(fixes, findings) {
 
 function checkAirportWeather(model, findings) {
   const entries = [
-    { airport: model.origin, chapter: 'departure' },
-    { airport: model.destination, chapter: 'arrival' },
-    ...model.alternates.map((a) => ({ airport: a, chapter: 'arrival' }))
+    { airport: model.origin, chapter: 'weather' },
+    { airport: model.destination, chapter: 'weather' },
+    ...model.alternates.map((a) => ({ airport: a, chapter: 'weather' }))
   ];
 
   for (const { airport, chapter } of entries) {
@@ -206,9 +206,9 @@ function checkWeights(model, findings) {
   const units = model.units;
 
   const pairs = [
-    { est: w.estZfw, max: w.maxZfw, label: 'ZFW', chapter: 'departure' },
-    { est: w.estTow, max: w.maxTow, label: 'TOW', chapter: 'takeoff' },
-    { est: w.estLdw, max: w.maxLdw, label: 'LDW', chapter: 'arrival' }
+    { est: w.estZfw, max: w.maxZfw, label: 'ZFW', chapter: 'fuel' },
+    { est: w.estTow, max: w.maxTow, label: 'TOW', chapter: 'fuel' },
+    { est: w.estLdw, max: w.maxLdw, label: 'LDW', chapter: 'fuel' }
   ];
 
   for (const { est, max, label, chapter } of pairs) {
@@ -262,7 +262,7 @@ function checkFuel(model, findings) {
       findings.push(
         finding(
           SEVERITY.CRITICAL,
-          'cruise',
+          'weather',
           bilingual('דלק מתחת למינימום בנתיב', 'Fuel below minimum enroute'),
           bilingual(
             `ב-${tightest.fix.ident} הדלק המתוכנן נמוך ב-${fmtWeight(Math.abs(tightest.margin), units)} מהמינימום הנדרש.`,
@@ -275,7 +275,7 @@ function checkFuel(model, findings) {
       findings.push(
         finding(
           SEVERITY.WARNING,
-          'cruise',
+          'weather',
           bilingual(`מרווח דלק צר ב-${tightest.fix.ident}`, `Tight fuel margin at ${tightest.fix.ident}`),
           bilingual(
             `רק ${fmtWeight(tightest.margin, units)} מעל המינימום. עיכוב או הסטה יצרכו את המרווח.`,
@@ -296,7 +296,7 @@ function checkFuel(model, findings) {
       findings.push(
         finding(
           SEVERITY.CRITICAL,
-          'descent',
+          'fuel',
           bilingual('דלק נחיתה מתחת לנדרש', 'Landing fuel below requirement'),
           bilingual(
             `דלק בנחיתה ${fmtWeight(model.fuel.planLanding, units)} מול ${fmtWeight(required, units)} נדרשים (רזרבה + חלופי).`,
@@ -308,7 +308,7 @@ function checkFuel(model, findings) {
       findings.push(
         finding(
           SEVERITY.WARNING,
-          'descent',
+          'fuel',
           bilingual('מעט דלק להחזקה', 'Little holding fuel'),
           bilingual(
             `מעבר לרזרבה ולחלופי נותרו ${fmtWeight(margin, units)} — פחות מ-15 דקות החזקה.`,
@@ -324,8 +324,8 @@ function checkFuel(model, findings) {
 
 function checkRunwayPerformance(model, findings) {
   const sides = [
-    { tlr: model.tlr.takeoff, chapter: 'takeoff', isTakeoff: true },
-    { tlr: model.tlr.landing, chapter: 'arrival', isTakeoff: false }
+    { tlr: model.tlr.takeoff, chapter: 'performance', isTakeoff: true },
+    { tlr: model.tlr.landing, chapter: 'performance', isTakeoff: false }
   ];
 
   for (const { tlr, chapter, isTakeoff } of sides) {
@@ -420,9 +420,9 @@ function checkNotams(model, findings) {
   const end = model.times.estIn || model.times.schedIn;
 
   const groups = [
-    { airport: model.origin, chapter: 'departure' },
-    { airport: model.destination, chapter: 'arrival' },
-    ...model.alternates.map((a) => ({ airport: a, chapter: 'arrival' }))
+    { airport: model.origin, chapter: 'notams' },
+    { airport: model.destination, chapter: 'notams' },
+    ...model.alternates.map((a) => ({ airport: a, chapter: 'notams' }))
   ];
 
   for (const { airport, chapter } of groups) {

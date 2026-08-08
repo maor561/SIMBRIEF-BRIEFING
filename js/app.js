@@ -11,24 +11,29 @@ import { getNotamFilter } from './ui.js';
 import { layoutMasonry } from './masonry.js';
 
 import renderOverview from './views/overview.js';
-import renderDeparture from './views/departure.js';
-import renderTakeoff from './views/takeoff.js';
-import renderCruise, { buildFixDetail } from './views/cruise.js';
-import renderDescent from './views/descent.js';
-import renderArrival from './views/arrival.js';
-import renderSummary from './views/summary.js';
+import renderWeather from './views/weather.js';
+import renderNotams from './views/notams.js';
+import renderFuel from './views/fuel.js';
+import renderPerformance from './views/performance.js';
+import renderNavlog from './views/navlog.js';
+import { buildFixDetail } from './charts.js';
 
 const STORAGE_USER = 'sbb.username';
 const STORAGE_CHAPTER = 'sbb.chapter';
 
+/*
+ * Chapters are types of information, not phases of flight -- the way an
+ * airline EFB briefing module is organised. `step` is the rail's small
+ * ordinal; the cover has none because it is not one of the numbered
+ * reference sections.
+ */
 const CHAPTERS = [
   { id: 'overview', step: '·', render: renderOverview, icon: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM3.2 9h17.6M3.2 15h17.6M12 3a15 15 0 0 1 0 18a15 15 0 0 1 0-18' },
-  { id: 'departure', step: '1', render: renderDeparture, icon: 'M4 20h16M6 20V9l6-4 6 4v11M10 20v-5h4v5' },
-  { id: 'takeoff', step: '2', render: renderTakeoff, icon: 'M3 19h18M4.5 14.5l3.5.6 9.2-8a1.7 1.7 0 0 1 2.4 2.4l-8 9.2.6 3.5-1.8-.6-1.4-3-3-1.4z' },
-  { id: 'cruise', step: '3', render: renderCruise, icon: 'M2 12h20M6 12l3-5M6 12l3 5M18 9l3 3-3 3' },
-  { id: 'descent', step: '4', render: renderDescent, icon: 'M3 5l6 6M3 5v5M3 5h5M21 19H9a5 5 0 0 1-5-5' },
-  { id: 'arrival', step: '5', render: renderArrival, icon: 'M3 20h18M5 16l14-2M8 6l3 8M8 6l-2 1 1 6' },
-  { id: 'summary', step: '✓', render: renderSummary, icon: 'M5 4h14v16H5zM9 9h6M9 13h6M9 17h3' }
+  { id: 'weather', step: '1', render: renderWeather, icon: 'M7.5 18a4.2 4.2 0 0 1-.7-8.34 5.3 5.3 0 0 1 10.2-1.9A4.3 4.3 0 0 1 16.8 18H7.5z' },
+  { id: 'notams', step: '2', render: renderNotams, icon: 'M12 3.6 21 19.4H3zM12 9.6v4.3M12 16.7h.01' },
+  { id: 'fuel', step: '3', render: renderFuel, icon: 'M5 21V5a2 2 0 0 1 2-2h5a2 2 0 0 1 2 2v16M3 21h13M17 8l2.4 2.4a2 2 0 0 1 .6 1.4V17a1.6 1.6 0 0 0 3.2 0v-6M8 8h3' },
+  { id: 'performance', step: '4', render: renderPerformance, icon: 'M3 19h18M4.5 14.5l3.5.6 9.2-8a1.7 1.7 0 0 1 2.4 2.4l-8 9.2.6 3.5-1.8-.6-1.4-3-3-1.4z' },
+  { id: 'navlog', step: '5', render: renderNavlog, icon: 'M4 8.5h14l-3.4-3.4M20 15.5H6l3.4 3.4' }
 ];
 
 const state = {
@@ -156,12 +161,12 @@ function renderRail() {
   const counts = countByChapter(state.findings);
   const total = state.findings.length;
 
-  // Overview and summary both stand for the whole flight, so they carry the
-  // total rather than a per-chapter count.
+  // The cover carries every finding, so its badge is the whole-flight total
+  // rather than a per-chapter count.
   const whole = { total, critical: state.findings.filter((f) => f.severity === SEVERITY.CRITICAL).length };
 
   el.rail.innerHTML = CHAPTERS.map((chapter) => {
-    const count = chapter.id === 'summary' || chapter.id === 'overview' ? whole : counts[chapter.id];
+    const count = chapter.id === 'overview' ? whole : counts[chapter.id];
     const badge = count?.total
       ? `<span class="rail-badge ${count.critical ? 'critical' : ''}">${count.total}</span>`
       : '';
