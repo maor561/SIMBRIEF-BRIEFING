@@ -10,6 +10,7 @@ import { escapeHtml, fmtZulu, fmtDuration } from './decode.js';
 import { getNotamFilter } from './ui.js';
 import { layoutMasonry } from './masonry.js';
 
+import renderOverview from './views/overview.js';
 import renderDeparture from './views/departure.js';
 import renderTakeoff from './views/takeoff.js';
 import renderCruise, { buildFixDetail } from './views/cruise.js';
@@ -21,6 +22,7 @@ const STORAGE_USER = 'sbb.username';
 const STORAGE_CHAPTER = 'sbb.chapter';
 
 const CHAPTERS = [
+  { id: 'overview', step: '·', render: renderOverview, icon: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM3.2 9h17.6M3.2 15h17.6M12 3a15 15 0 0 1 0 18a15 15 0 0 1 0-18' },
   { id: 'departure', step: '1', render: renderDeparture, icon: 'M4 20h16M6 20V9l6-4 6 4v11M10 20v-5h4v5' },
   { id: 'takeoff', step: '2', render: renderTakeoff, icon: 'M3 19h18M4.5 14.5l3.5.6 9.2-8a1.7 1.7 0 0 1 2.4 2.4l-8 9.2.6 3.5-1.8-.6-1.4-3-3-1.4z' },
   { id: 'cruise', step: '3', render: renderCruise, icon: 'M2 12h20M6 12l3-5M6 12l3 5M18 9l3 3-3 3' },
@@ -33,7 +35,7 @@ const state = {
   raw: null,
   model: null,
   findings: [],
-  chapter: localStorage.getItem(STORAGE_CHAPTER) || 'departure',
+  chapter: localStorage.getItem(STORAGE_CHAPTER) || 'overview',
   username: localStorage.getItem(STORAGE_USER) || '',
   demo: false,
   loading: false
@@ -154,8 +156,12 @@ function renderRail() {
   const counts = countByChapter(state.findings);
   const total = state.findings.length;
 
+  // Overview and summary both stand for the whole flight, so they carry the
+  // total rather than a per-chapter count.
+  const whole = { total, critical: state.findings.filter((f) => f.severity === SEVERITY.CRITICAL).length };
+
   el.rail.innerHTML = CHAPTERS.map((chapter) => {
-    const count = chapter.id === 'summary' ? { total, critical: state.findings.filter((f) => f.severity === SEVERITY.CRITICAL).length } : counts[chapter.id];
+    const count = chapter.id === 'summary' || chapter.id === 'overview' ? whole : counts[chapter.id];
     const badge = count?.total
       ? `<span class="rail-badge ${count.critical ? 'critical' : ''}">${count.total}</span>`
       : '';
@@ -248,6 +254,18 @@ document.addEventListener('click', (event) => {
         image.src = trigger.dataset.src;
         image.alt = trigger.textContent.trim();
       }
+      break;
+    }
+
+    case 'map-mode': {
+      const group = trigger.closest('[data-map-group]');
+      if (!group) break;
+      group.querySelectorAll('[data-action="map-mode"]').forEach((tab) => {
+        tab.setAttribute('aria-selected', String(tab === trigger));
+      });
+      group.querySelectorAll('[data-map-pane]').forEach((pane) => {
+        pane.hidden = pane.dataset.mapPane !== trigger.dataset.mode;
+      });
       break;
     }
 

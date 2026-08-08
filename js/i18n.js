@@ -20,6 +20,7 @@ const STRINGS = {
     'setup.loading': 'טוען את ה-OFP...',
     'setup.hint': 'שם המשתמש נשמר במכשיר בלבד.',
 
+    'nav.overview': 'סקירה',
     'nav.departure': 'שדה המראה',
     'nav.takeoff': 'המראה',
     'nav.cruise': 'שיוט',
@@ -94,6 +95,10 @@ const STRINGS = {
     'notam.estimated': 'משוער',
     'notam.enroute': 'NOTAM בנתיב',
     'notam.enrouteNote': 'רק הודעות בחומרה גבוהה מה-FIRים שבמסלול',
+
+    'ov.mapTrack': 'נתיב מתוכנן',
+    'ov.mapChart': 'מפת SimBrief',
+    'ov.mapUnavailable': 'מפת SimBrief כבר לא זמינה עבור ה-OFP הזה',
 
     'dep.title': 'שדה המראה',
     'dep.glance': 'תמונת מצב',
@@ -256,6 +261,7 @@ const STRINGS = {
     'setup.loading': 'Fetching OFP...',
     'setup.hint': 'Stored on this device only.',
 
+    'nav.overview': 'Overview',
     'nav.departure': 'Departure',
     'nav.takeoff': 'Takeoff',
     'nav.cruise': 'Cruise',
@@ -330,6 +336,10 @@ const STRINGS = {
     'notam.estimated': 'estimated',
     'notam.enroute': 'Enroute NOTAMs',
     'notam.enrouteNote': 'High-severity items from FIRs along the route only',
+
+    'ov.mapTrack': 'Planned track',
+    'ov.mapChart': 'SimBrief map',
+    'ov.mapUnavailable': 'The SimBrief map is no longer available for this OFP',
 
     'dep.title': 'Departure Airport',
     'dep.glance': 'Flight at a Glance',

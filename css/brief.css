@@ -419,6 +419,369 @@ button {
 .card.accent-red { border-color: rgba(255, 92, 102, 0.5); }
 .card.accent-amber { border-color: rgba(255, 176, 46, 0.45); }
 
+/* ------------------------------------------------------------ cover page */
+
+/*
+ * The overview chapter is a fixed composition rather than a card wall, so it
+ * sits outside `.grid` and the masonry pass entirely. Reading order is fixed:
+ * who and whether anything is wrong, then where and when, then the picture,
+ * then the numbers.
+ */
+.cover {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.cover-id {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  flex-wrap: wrap;
+}
+
+.cover-callsign {
+  font-family: var(--mono);
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--amber);
+  letter-spacing: 0.02em;
+}
+
+.cover-type {
+  font-size: 12px;
+  color: var(--dimmer);
+}
+
+.cover-id .grow { flex: 1; }
+
+.cover-flag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  background: var(--panel-3);
+  color: var(--dim);
+}
+
+.cover-flag.warn { background: var(--amber-bg); color: var(--amber); }
+.cover-flag.bad { background: var(--red-bg); color: var(--red); }
+.cover-flag.good { background: var(--green-bg); color: var(--green); }
+
+/* The journey reads left-to-right in both languages, like a departure board. */
+.cover-journey {
+  direction: ltr;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 20px 22px;
+  background: var(--panel);
+  border: 1px solid var(--line-solid);
+  border-radius: var(--radius);
+}
+
+.cover-end {
+  flex: none;
+  text-align: center;
+  min-width: 118px;
+}
+
+.cover-icao {
+  display: block;
+  font-family: var(--mono);
+  font-size: 40px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+.cover-city {
+  display: block;
+  margin-block-start: 6px;
+  font-size: 11.5px;
+  color: var(--dim);
+}
+
+.cover-when {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-block-start: 9px;
+  font-family: var(--mono);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.cover-when-label {
+  font-family: var(--sans);
+  font-size: 10px;
+  font-weight: 400;
+  color: var(--dimmer);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.cover-path {
+  flex: 1;
+  min-width: 80px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.cover-level {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--blue);
+  white-space: nowrap;
+}
+
+.cover-line {
+  position: relative;
+  width: 100%;
+  height: 1px;
+  background: var(--line-solid);
+}
+
+.cover-plane {
+  position: absolute;
+  inset-inline-start: 50%;
+  inset-block-start: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--panel);
+  border: 1px solid var(--line-solid);
+  color: var(--dim);
+}
+
+.cover-sub {
+  font-size: 11px;
+  color: var(--dimmer);
+  white-space: nowrap;
+}
+
+/* map */
+
+.cover-map {
+  background: var(--panel);
+  border: 1px solid var(--line-solid);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.cover-map-tabs {
+  display: flex;
+  gap: 6px;
+  padding: 9px 13px;
+  background: var(--panel-2);
+  border-block-end: 1px solid var(--line-solid);
+}
+
+.cover-track svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  background: #0a0e15;
+}
+
+.ov-grid { stroke: rgba(255, 255, 255, 0.05); stroke-width: 1; }
+.ov-track { fill: none; stroke: var(--blue); stroke-width: 2; stroke-linejoin: round; }
+.ov-fix { fill: var(--dimmer); }
+.ov-port { fill: #0a0e15; stroke: var(--green); stroke-width: 2.5; }
+.ov-altn { fill: #0a0e15; stroke: var(--dim); stroke-width: 2; }
+.ov-label { fill: var(--text); font-family: var(--mono); font-size: 13px; }
+.ov-label.alt { fill: var(--dim); font-size: 11px; }
+
+.cover-chart.padded { padding: 11px 13px; }
+
+.cover-chart img {
+  display: block;
+  width: 100%;
+  border-radius: var(--radius-sm);
+  /* SimBrief ships a light-background map; invert it into the dark theme and
+     spin the hue back so the route colours survive the inversion. */
+  filter: invert(1) hue-rotate(180deg) saturate(0.85) brightness(0.92);
+}
+
+.cover-chart-fallback {
+  display: none;
+  padding: 30px 14px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--dimmer);
+}
+
+.cover-chart[data-failed] img { display: none; }
+.cover-chart[data-failed] .cover-chart-fallback { display: block; }
+
+/* numbers */
+
+.cover-numbers {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 1px;
+  background: var(--line-solid);
+  border: 1px solid var(--line-solid);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.cover-cell {
+  background: var(--panel);
+  padding: 12px 14px;
+}
+
+.cover-cell .k {
+  display: block;
+  font-size: 10.5px;
+  color: var(--dimmer);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.cover-cell .v {
+  display: block;
+  margin-block-start: 3px;
+  font-family: var(--mono);
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.cover-cell .v i {
+  font-style: normal;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--dim);
+  margin-inline-start: 3px;
+}
+
+/* runways */
+
+.cover-runways {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1px;
+  background: var(--line-solid);
+  border: 1px solid var(--line-solid);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.cover-rwy {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  background: var(--panel);
+  padding: 12px 14px;
+}
+
+.cover-rwy-role {
+  font-size: 10.5px;
+  color: var(--dimmer);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  min-width: 62px;
+}
+
+.cover-rwy-id {
+  font-family: var(--mono);
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--blue);
+  letter-spacing: -0.01em;
+}
+
+.cover-rwy-wind {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  font-size: 11.5px;
+  color: var(--dim);
+}
+
+.cover-rwy-wind b {
+  font-family: var(--mono);
+  font-size: 13px;
+}
+
+.cover-rwy-wind .good { color: var(--green); }
+.cover-rwy-wind .warn { color: var(--amber); }
+.cover-rwy-wind .bad { color: var(--red); }
+
+/* weather */
+
+.cover-wx {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 1px;
+  background: var(--line-solid);
+  border: 1px solid var(--line-solid);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.cover-wx-cell {
+  background: var(--panel);
+  padding: 12px 14px;
+}
+
+.cover-wx-top {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+
+.cover-wx-top .icao {
+  font-family: var(--mono);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.cover-wx-top .role {
+  font-size: 10.5px;
+  color: var(--dimmer);
+}
+
+.cover-wx-figs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin-block-start: 9px;
+  font-size: 11.5px;
+  color: var(--dimmer);
+}
+
+.cover-wx-figs span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.cover-wx-figs b {
+  font-family: var(--mono);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--dim);
+}
+
+@media (max-width: 640px) {
+  .cover-journey { gap: 12px; padding: 16px 14px; }
+  .cover-icao { font-size: 30px; }
+  .cover-end { min-width: 92px; }
+}
+
 /* --------------------------------------------------------- flight glance */
 
 /*
