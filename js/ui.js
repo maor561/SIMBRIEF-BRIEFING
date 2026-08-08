@@ -24,6 +24,7 @@ import {
   notamSeverity,
   notamActiveDuring,
   notamIconName,
+  highlightNotam,
   decodeSurface
 } from './decode.js';
 import { severityClass, severityLabel, SEVERITY } from './analyze.js';
@@ -57,6 +58,8 @@ const ICON_PATHS = {
   clock: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 6.8V12l3.4 2',
   headset: 'M4 15v-3a8 8 0 0 1 16 0v3M4 15a2 2 0 0 0 2 2h1.2v-5.4H6a2 2 0 0 0-2 2zM20 15a2 2 0 0 1-2 2h-1.2v-5.4H18a2 2 0 0 1 2 2zM19 17.6v.6a2.6 2.6 0 0 1-2.6 2.6H13',
   routeSwap: 'M4 8.5h14l-3.4-3.4M20 15.5H6l3.4 3.4',
+  sort: 'M4 6.5h11M4 12h7M4 17.5h4M17.5 8.5V19m0 0 3-3m-3 3-3-3',
+  expand: 'M8.5 8.5 12 5l3.5 3.5M8.5 15.5 12 19l3.5-3.5',
   runway: 'M3 9h18M3 15h18M9 12h2M13 12h2',
   taxiway: 'M3 13c4.5 0 4.5-6.5 9-6.5S16.5 13 21 13',
   lighting: 'M9.3 18h5.4M10.2 20.7h3.6M8.2 13.6A3.8 3.8 0 1 1 15.8 13.6c0 1.7-.9 2.5-1.4 3.1-.3.4-.5.7-.5 1.5H9.9c0-.8-.1-1.1-.4-1.5-.5-.6-1.3-1.4-1.3-3.1z',
@@ -361,6 +364,66 @@ export function atisBlock(airport) {
   });
 }
 
+/* ---------------------------------------------------------- airport head */
+
+/**
+ * The identity strip an EFB puts above any per-airport page: status dot, role
+ * tag, ICAO-IATA-name, and the three figures a crew reads without opening the
+ * METAR. Shared by the weather and NOTAM screens so an airport looks the same
+ * wherever it appears.
+ */
+export function airportHead(airport, role, runways, planned) {
+  if (!airport) return '';
+  const m = airport.metar ? parseMetar(airport.metar) : null;
+  const name = [airport.icao, airport.iata, airport.name].filter(Boolean).join(' - ');
+  const list = (runways || []).filter(Boolean);
+
+  return `
+    <div class="wx-head">
+      ${categoryDot(airport.metarCategory)}
+      <span class="wx-role">${escapeHtml(role)}</span>
+      <span class="wx-name ltr">${escapeHtml(name)}</span>
+      <span class="grow"></span>
+      <div class="wx-stats">
+        ${tempStat(m)}
+        ${windStat(m)}
+        ${ceilingStat(m)}
+      </div>
+    </div>
+    ${
+      list.length
+        ? `<div class="wx-rwys ltr">RWY ${list
+            .map((r) => (r === planned ? `<span class="planned">${escapeHtml(r)}</span>` : escapeHtml(r)))
+            .join(' ')}</div>`
+        : ''
+    }
+  `;
+}
+
+function tempStat(m) {
+  if (!m || m.temperature === null) return '';
+  const f = Math.round((m.temperature * 9) / 5 + 32);
+  return `<span class="wx-stat">${icon('temperature', { size: 16 })}<b class="ltr">${m.temperature}°C</b><i class="ltr">(${f}°F)</i></span>`;
+}
+
+function windStat(m) {
+  if (!m?.wind) return '';
+  const w = m.wind;
+  const text = w.calm
+    ? 'CALM'
+    : `${w.direction === null ? 'VRB' : `${String(w.direction).padStart(3, '0')}°`} ${w.speed ?? '—'}${w.gust ? `G${w.gust}` : ''} KT`;
+  return `<span class="wx-stat">${icon('wind', { size: 16 })}<b class="ltr">${escapeHtml(text)}</b></span>`;
+}
+
+function ceilingStat(m) {
+  if (!m) return '';
+  if (m.cavok) return `<span class="wx-stat">${icon('ceiling', { size: 16 })}<b class="ltr">CAVOK</b></span>`;
+  const base = ceilingOf(m);
+  if (base === null) return `<span class="wx-stat">${icon('ceiling', { size: 16 })}<b class="ltr">—</b></span>`;
+  const layer = m.clouds.find((c) => ['BKN', 'OVC', 'VV'].includes(c.amount) && c.baseFt === base);
+  return `<span class="wx-stat">${icon('ceiling', { size: 16 })}<b class="ltr">${escapeHtml(layer?.amount || '')} ${fmtNumber(base)} ft</b></span>`;
+}
+
 /* ------------------------------------------------------------------ NOTAMs */
 
 /** Filter state per airport, kept across re-renders of a chapter. */
@@ -368,75 +431,145 @@ export const notamFilters = new Map();
 
 export function getNotamFilter(icao) {
   if (!notamFilters.has(icao)) {
-    notamFilters.set(icao, { activeOnly: true, hideObstacles: false });
+    notamFilters.set(icao, {
+      activeOnly: true,
+      hideObstacles: false,
+      search: '',
+      sort: 'severity',
+      expanded: false
+    });
   }
   return notamFilters.get(icao);
 }
 
+/** Search box and the two icon buttons that sit beside it. */
+export function notamControls(icao) {
+  const filter = getNotamFilter(icao);
+  return `<div class="notam-bar">
+    <div class="notam-search">
+      <input type="search" data-action="notam-search" data-icao="${icao}"
+             value="${escapeHtml(filter.search)}" placeholder="${escapeHtml(t('notam.search'))}"
+             aria-label="${escapeHtml(t('notam.search'))}">
+      ${icon('visibility', { size: 16 })}
+    </div>
+    <button class="notam-btn" data-action="notam-sort" data-icao="${icao}"
+            aria-pressed="${filter.sort === 'date'}"
+            title="${escapeHtml(filter.sort === 'date' ? t('notam.sortDate') : t('notam.sortSeverity'))}">
+      ${icon('sort', { size: 17 })}
+    </button>
+    <button class="notam-btn" data-action="notam-expand" data-icao="${icao}"
+            aria-pressed="${filter.expanded}"
+            title="${escapeHtml(t('notam.expandAll'))}">
+      ${icon('expand', { size: 17 })}
+    </button>
+  </div>
+  <div class="notam-toggles">
+    <label class="toggle">
+      <input type="checkbox" data-action="notam-filter" data-key="activeOnly" data-icao="${icao}" ${filter.activeOnly ? 'checked' : ''}>
+      ${escapeHtml(t('notam.activeOnly'))}
+    </label>
+    <label class="toggle">
+      <input type="checkbox" data-action="notam-filter" data-key="hideObstacles" data-icao="${icao}" ${filter.hideObstacles ? 'checked' : ''}>
+      ${escapeHtml(t('notam.hideObstacles'))}
+    </label>
+  </div>`;
+}
+
 /**
- * Sorts NOTAMs by severity, marks the ones touching the planned runway, and
- * applies the current filter. Returns the list markup only, so a filter change
- * can swap it without rebuilding the card.
+ * The NOTAM list as cards: a column header carrying age, number and validity,
+ * then the body with its facility and condition words picked out. Returns the
+ * list markup only, so a filter change can swap it without rebuilding the
+ * section around it.
  */
 export function notamListMarkup(airport, window) {
   const filter = getNotamFilter(airport.icao);
+  const needle = filter.search.trim().toUpperCase();
 
   const ranked = airport.notams
     .map((n) => ({ notam: n, severity: notamSeverity(n, airport.plannedRunway) }))
     .filter(({ notam }) => {
       if (filter.hideObstacles && notam.isObstacle) return false;
       if (filter.activeOnly && !notamActiveDuring(notam, window?.start, window?.end)) return false;
+      if (needle) {
+        const haystack = `${notam.id || ''} ${notam.subject || ''} ${notam.status || ''} ${notam.text || notam.raw || ''}`.toUpperCase();
+        if (!haystack.includes(needle)) return false;
+      }
       return true;
     })
-    .sort((a, b) => b.severity - a.severity);
+    .sort((a, b) =>
+      filter.sort === 'date'
+        ? startTime(b.notam) - startTime(a.notam)
+        : b.severity - a.severity
+    );
 
   if (!ranked.length) {
     return `<div class="empty-state">${escapeHtml(t('notam.empty'))}</div>`;
   }
 
-  return ranked
-    .map(({ notam, severity }) => {
-      const body = notam.html ? sanitizeNotamHtml(notam.html) : escapeHtml(notam.text || notam.raw || '');
-      const from = notam.effective ? fmtZuluDate(new Date(notam.effective)) : null;
-      const to = notam.expires ? fmtZuluDate(new Date(notam.expires)) : null;
-
-      return `<article class="notam sev-${severity}">
-        <div class="top">
-          <span class="notam-icon">${icon(notamIconName(notam), { size: 15 })}</span>
-          <span class="nid">${escapeHtml(notam.id || '')}</span>
-          ${notam.subject ? chip(notam.subject, severity === 3 ? 'red' : severity === 2 ? 'amber' : '') : ''}
-          ${notam.status ? chip(notam.status) : ''}
-          ${notam.isObstacle ? chip('OBST') : ''}
-        </div>
-        <div class="text">${body}</div>
-        ${notam.schedule ? `<div class="schedule">${escapeHtml(notam.schedule)}</div>` : ''}
-        ${from || to ? `<div class="when">${from ? `${t('notam.effective')} ${from}` : ''}${to ? `  ·  ${t('notam.expires')} ${to}${notam.expiryEstimated ? ` (${t('notam.estimated')})` : ''}` : ''}</div>` : ''}
-      </article>`;
-    })
-    .join('');
+  return ranked.map(({ notam, severity }) => notamArticle(notam, severity, filter.expanded)).join('');
 }
 
-export function notamCard(airport, window) {
-  const filter = getNotamFilter(airport.icao);
-  const criticalCount = airport.notams.filter((n) => notamSeverity(n, airport.plannedRunway) === 3).length;
+function startTime(notam) {
+  const value = notam.effective ? new Date(notam.effective).getTime() : NaN;
+  return Number.isNaN(value) ? 0 : value;
+}
 
-  const tools = `<div class="notam-tools">
-    <label class="toggle">
-      <input type="checkbox" data-action="notam-filter" data-key="activeOnly" data-icao="${airport.icao}" ${filter.activeOnly ? 'checked' : ''}>
-      ${escapeHtml(t('notam.activeOnly'))}
-    </label>
-    <label class="toggle">
-      <input type="checkbox" data-action="notam-filter" data-key="hideObstacles" data-icao="${airport.icao}" ${filter.hideObstacles ? 'checked' : ''}>
-      ${escapeHtml(t('notam.hideObstacles'))}
-    </label>
-  </div>`;
+function notamArticle(notam, severity, expanded) {
+  // Highlight the plain text rather than SimBrief's own <b> markup: it draws
+  // the same weight on every keyword, where the split between "which
+  // facility" and "what happened to it" is the whole point of the colouring.
+  const body = highlightNotam(notam.text || notam.raw || '');
 
-  return flushCard({
-    title: `${t('notam.title')} — ${airport.icao}`,
-    badge: `${criticalCount ? chip(`${criticalCount} ${t('sev.critical')}`, 'red') : ''}${chip(`${airport.notams.length} ${t('notam.count')}`)}`,
-    body: `${tools}<div data-notam-list data-icao="${airport.icao}">${notamListMarkup(airport, window)}</div>`,
-    cls: criticalCount ? 'accent-red' : ''
-  });
+  return `<article class="notam sev-${severity} ${expanded ? 'expanded' : ''}">
+    <div class="notam-cols">
+      ${col(t('notam.age'), notamAge(notam))}
+      ${col(t('notam.number'), notam.id || '—')}
+      ${col(t('notam.start'), stamp(notam.effective))}
+      ${col(t('notam.end'), notam.expires ? `${stamp(notam.expires)}${notam.expiryEstimated ? ' EST' : ''}` : t('common.none'))}
+      <span class="notam-kind">${icon(notamIconName(notam), { size: 15 })}</span>
+    </div>
+    ${
+      notam.subject || notam.status
+        ? `<div class="notam-tags">
+             ${notam.subject ? chip(notam.subject, severity === 3 ? 'red' : severity === 2 ? 'amber' : '') : ''}
+             ${notam.status ? chip(notam.status) : ''}
+             ${notam.isObstacle ? chip('OBST') : ''}
+           </div>`
+        : ''
+    }
+    <div class="notam-body">${body}</div>
+    ${notam.schedule ? `<div class="schedule">${escapeHtml(notam.schedule)}</div>` : ''}
+    <button class="notam-full" data-action="notam-full">${escapeHtml(t('notam.full'))}</button>
+  </article>`;
+}
+
+function col(label, value) {
+  return `<span class="notam-col">
+    <i>${escapeHtml(label)}</i>
+    <b class="ltr">${escapeHtml(String(value))}</b>
+  </span>`;
+}
+
+/** "NEW" while it is under a day old, then whole days since it took effect. */
+function notamAge(notam) {
+  if (!notam.effective) return '—';
+  const from = new Date(notam.effective).getTime();
+  if (Number.isNaN(from)) return '—';
+  const days = Math.floor((Date.now() - from) / 86400000);
+  if (days < 0) return t('notam.pending');
+  if (days < 1) return t('notam.new');
+  return `${days} ${days === 1 ? t('notam.day') : t('notam.days')}`;
+}
+
+const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+
+/** "18 AUG 2021 - 0900", the way a NOTAM validity reads on a release. */
+function stamp(value) {
+  if (!value) return '—';
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return '—';
+  const p = (n) => String(n).padStart(2, '0');
+  return `${p(d.getUTCDate())} ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()} - ${p(d.getUTCHours())}${p(d.getUTCMinutes())}`;
 }
 
 /**

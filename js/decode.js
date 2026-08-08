@@ -27,7 +27,12 @@ export function escapeHtml(value) {
 
 /** NOTAM html from SimBrief contains only <b> tags; keep those, drop the rest. */
 export function sanitizeNotamHtml(html) {
-  return escapeHtml(html).replace(/&lt;(\/?)b&gt;/g, '<$1b>');
+  // SimBrief marks emphasis with <b> and line breaks with <br>. Everything is
+  // escaped first, then just those two are restored -- without the <br> case
+  // the tag showed up as literal text in the middle of the notice.
+  return escapeHtml(html)
+    .replace(/&lt;(\/?)b&gt;/g, '<$1b>')
+    .replace(/&lt;br\s*\/?&gt;/gi, '\n');
 }
 
 export function fmtNumber(value, digits = 0) {
@@ -635,6 +640,42 @@ export function highlightWx(raw) {
     })
     .join('');
 }
+
+/**
+ * Colour-codes a NOTAM body the same way: the facility a notice is about
+ * reads amber, the condition that makes it matter reads as a red badge. The
+ * text stays exactly as issued -- only its emphasis changes.
+ */
+export function highlightNotam(raw) {
+  if (!raw) return '';
+  return String(raw)
+    .split(/(\s+)/)
+    .map((token) => {
+      if (!token.trim()) return escapeHtml(token);
+      const bare = token.toUpperCase().replace(/[.,;:]+$/, '');
+      const escaped = escapeHtml(token);
+      if (NOTAM_STATUS.has(bare)) return `<span class="wx-bad">${escaped}</span>`;
+      if (NOTAM_SUBJECT.has(bare)) return `<span class="wx-warn">${escaped}</span>`;
+      return escaped;
+    })
+    .join('');
+}
+
+/* Conditions that take capability away -- the words that change the plan. */
+const NOTAM_STATUS = new Set([
+  'CLSD', 'CLOSED', 'U/S', 'UNSERVICEABLE', 'UNSVBL', 'WIP', 'PROHIBITED',
+  'DANGER', 'SUSPENDED', 'WITHDRAWN', 'CNL', 'CANCELLED'
+]);
+
+/* The facility a notice is about, plus the qualifiers that condition it.
+   AVBL and LTD sit here rather than above: they narrow what is on offer,
+   they do not withdraw it. */
+const NOTAM_SUBJECT = new Set([
+  'RWY', 'TWY', 'ILS', 'GATE', 'APRON', 'STAND', 'PAPI', 'VASI', 'DME', 'VOR',
+  'NDB', 'LOC', 'GP', 'ALS', 'RVR', 'LGT', 'LGTS', 'AD', 'OBST', 'CRANE',
+  'GLD', 'SID', 'STAR', 'IAP', 'FATO', 'HEL',
+  'LTD', 'PPR', 'AVBL', 'ACTIVATED', 'ACTIVE'
+]);
 
 function classifyWxToken(token) {
   // Convective cloud, thunder, freezing precip, hail, fog and the rare

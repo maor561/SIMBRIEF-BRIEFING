@@ -7,7 +7,7 @@ import { t, setLang, toggleLang, getLang, applyDocumentLanguage } from './i18n.j
 import { normalizeOfp } from './normalize.js';
 import { analyze, countByChapter, SEVERITY } from './analyze.js';
 import { escapeHtml, fmtZulu, fmtDuration } from './decode.js';
-import { getNotamFilter } from './ui.js';
+import { getNotamFilter, notamControls, notamListMarkup } from './ui.js';
 import { layoutMasonry } from './masonry.js';
 
 import renderOverview from './views/overview.js';
@@ -288,6 +288,25 @@ document.addEventListener('click', (event) => {
       break;
     }
 
+    case 'notam-sort': {
+      const filter = getNotamFilter(trigger.dataset.icao);
+      filter.sort = filter.sort === 'severity' ? 'date' : 'severity';
+      refreshNotams(trigger.dataset.icao);
+      break;
+    }
+
+    case 'notam-expand': {
+      const filter = getNotamFilter(trigger.dataset.icao);
+      filter.expanded = !filter.expanded;
+      refreshNotams(trigger.dataset.icao);
+      break;
+    }
+
+    // Per-card override; leaves the airport's expand-all state alone.
+    case 'notam-full':
+      trigger.closest('.notam')?.classList.toggle('expanded');
+      break;
+
     default:
       break;
   }
@@ -300,13 +319,47 @@ document.addEventListener('change', (event) => {
   const { icao, key } = input.dataset;
   const filter = getNotamFilter(icao);
   filter[key] = input.checked;
-
-  // A patched-in-place list would change that card's height without the
-  // masonry columns around it knowing, so this goes through a full chapter
-  // refresh instead -- scroll position is preserved so toggling a checkbox
-  // doesn't jump the reader back to the top of the page.
-  renderChapter({ preserveScroll: true });
+  refreshNotams(icao);
 });
+
+/*
+ * Typing filters as you go. The list is swapped in place rather than through
+ * renderChapter, because a full re-render would rebuild the input and drop
+ * focus mid-word.
+ */
+document.addEventListener('input', (event) => {
+  const input = event.target.closest('[data-action="notam-search"]');
+  if (!input) return;
+  getNotamFilter(input.dataset.icao).search = input.value;
+  refreshNotams(input.dataset.icao, { keepFocus: true });
+});
+
+/** Rebuilds one airport's NOTAM list from its current filter state. */
+function refreshNotams(icao, { keepFocus = false } = {}) {
+  const airport = [state.model.origin, state.model.destination, ...state.model.alternates]
+    .find((a) => a?.icao === icao);
+  const list = document.querySelector(`[data-notam-list][data-icao="${icao}"]`);
+  if (!airport || !list) return;
+
+  list.innerHTML = notamListMarkup(airport, flightWindow());
+
+  if (keepFocus) return;
+  // The control row reflects sort/expand state, so redraw it too -- except
+  // while typing, when replacing the input would steal the caret.
+  const bar = list.previousElementSibling;
+  if (bar?.classList.contains('notam-toggles')) {
+    bar.previousElementSibling?.remove();
+    bar.remove();
+    list.insertAdjacentHTML('beforebegin', notamControls(icao));
+  }
+}
+
+function flightWindow() {
+  return {
+    start: state.model.times.estOut || state.model.times.schedOut,
+    end: state.model.times.estIn || state.model.times.schedIn
+  };
+}
 
 /* Swipe between chapters. Ignores gestures that start on a scrollable chart. */
 let touchStart = null;
