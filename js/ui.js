@@ -54,6 +54,9 @@ const ICON_PATHS = {
   visibility: 'M2 12S6 5 12 5s10 7 10 7-4 7-10 7-10-7-10-7zM12 9.4a2.6 2.6 0 1 0 0 5.2 2.6 2.6 0 0 0 0-5.2z',
   ceiling: 'M7.5 18a4.2 4.2 0 0 1-.7-8.34 5.3 5.3 0 0 1 10.2-1.9A4.3 4.3 0 0 1 16.8 18H7.5z',
   temperature: 'M13 14.76V5a1.8 1.8 0 1 0-3.6 0v9.76a4 4 0 1 0 3.6 0z',
+  clock: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 6.8V12l3.4 2',
+  headset: 'M4 15v-3a8 8 0 0 1 16 0v3M4 15a2 2 0 0 0 2 2h1.2v-5.4H6a2 2 0 0 0-2 2zM20 15a2 2 0 0 1-2 2h-1.2v-5.4H18a2 2 0 0 1 2 2zM19 17.6v.6a2.6 2.6 0 0 1-2.6 2.6H13',
+  routeSwap: 'M4 8.5h14l-3.4-3.4M20 15.5H6l3.4 3.4',
   runway: 'M3 9h18M3 15h18M9 12h2M13 12h2',
   taxiway: 'M3 13c4.5 0 4.5-6.5 9-6.5S16.5 13 21 13',
   lighting: 'M9.3 18h5.4M10.2 20.7h3.6M8.2 13.6A3.8 3.8 0 1 1 15.8 13.6c0 1.7-.9 2.5-1.4 3.1-.3.4-.5.7-.5 1.5H9.9c0-.8-.1-1.1-.4-1.5-.5-.6-1.3-1.4-1.3-3.1z',
@@ -72,6 +75,23 @@ export function icon(name, { size = 15 } = {}) {
 export function categoryDot(category) {
   if (!category) return '';
   return `<span class="cat-dot ${categoryClass(category)}"></span>`;
+}
+
+/**
+ * A titled section: icon and title sit above the panel rather than inside a
+ * card header. Airline EFBs label a region of the page this way, which reads
+ * as "here is the schedule" instead of "here is another card".
+ */
+export function section(title, iconName, body, { action = '', cls = '' } = {}) {
+  return `<section class="sect ${cls}">
+    <div class="sect-head">
+      ${iconName ? icon(iconName, { size: 19 }) : ''}
+      <h2>${escapeHtml(title)}</h2>
+      <span class="grow"></span>
+      ${action}
+    </div>
+    <div class="sect-body">${body}</div>
+  </section>`;
 }
 
 /* ------------------------------------------------------------------- cards */

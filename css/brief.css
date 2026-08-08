@@ -6,26 +6,30 @@
    ========================================================================== */
 
 :root {
-  --bg: #080b10;
-  --panel: #121822;
-  --panel-2: #182030;
-  --panel-3: #1e2839;
-  --line: #26314400;
-  --line-solid: #263144;
-  --text: #e9eef7;
-  --dim: #8ea0bb;
-  --dimmer: #5f7189;
+  /* Deep navy-teal rather than near-black: the palette airline EFBs settle on
+     because it stays readable in a sunlit cockpit without the harsh contrast
+     of white-on-black, and lets cyan carry the "this is the flight" accent. */
+  --bg: #08202e;
+  --panel: #0e3346;
+  --panel-2: #124055;
+  --panel-3: #17506a;
+  --inset: #061a26;
+  --line: #1c4a6300;
+  --line-solid: #1c4a63;
+  --text: #eaf4fa;
+  --dim: #8fb6cb;
+  --dimmer: #6592aa;
 
   --amber: #ffb02e;
   --green: #3ad48a;
   --red: #ff5c66;
-  --blue: #4fa8ff;
+  --blue: #56bde9;
   --violet: #a988ff;
 
-  --amber-bg: rgba(255, 176, 46, 0.12);
-  --green-bg: rgba(58, 212, 138, 0.12);
-  --red-bg: rgba(255, 92, 102, 0.13);
-  --blue-bg: rgba(79, 168, 255, 0.12);
+  --amber-bg: rgba(255, 176, 46, 0.14);
+  --green-bg: rgba(58, 212, 138, 0.14);
+  --red-bg: rgba(255, 92, 102, 0.15);
+  --blue-bg: rgba(86, 189, 233, 0.14);
 
   --radius: 12px;
   --radius-sm: 8px;
@@ -120,7 +124,7 @@ button {
   align-items: center;
   gap: 14px;
   padding-inline: 14px;
-  background: linear-gradient(180deg, #131b28, #0c1119);
+  background: linear-gradient(180deg, #124055, #0a2434);
   border-block-end: 1px solid var(--line-solid);
   overflow: hidden;
 }
@@ -236,7 +240,7 @@ button {
   flex-direction: column;
   gap: 4px;
   padding: 10px 8px;
-  background: #0b1017;
+  background: #061a26;
   border-inline-end: 1px solid var(--line-solid);
   overflow-y: auto;
 }
@@ -419,47 +423,40 @@ button {
 .card.accent-red { border-color: rgba(255, 92, 102, 0.5); }
 .card.accent-amber { border-color: rgba(255, 176, 46, 0.45); }
 
-/* ------------------------------------------------------------ cover page */
+/* ---------------------------------------------------------------- section */
 
 /*
- * The overview chapter is a fixed composition rather than a card wall, so it
- * sits outside `.grid` and the masonry pass entirely. Reading order is fixed:
- * who and whether anything is wrong, then where and when, then the picture,
- * then the numbers.
+ * A titled region: the icon and title sit above the panel instead of inside a
+ * card header, so the page reads as named sections of one briefing rather
+ * than a stack of unrelated cards.
  */
-.cover {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+.sect {
+  display: block;
 }
 
-.cover-id {
+.sect-head {
   display: flex;
   align-items: center;
-  gap: 11px;
-  flex-wrap: wrap;
+  gap: 9px;
+  padding-block-end: 10px;
+  color: var(--text);
 }
 
-.cover-callsign {
-  font-family: var(--mono);
-  font-size: 20px;
-  font-weight: 700;
-  color: var(--amber);
-  letter-spacing: 0.02em;
+.sect-head h2 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
 }
 
-.cover-type {
-  font-size: 12px;
-  color: var(--dimmer);
-}
+.sect-head .icon { color: var(--dim); }
+.sect-head .grow { flex: 1; }
 
-.cover-id .grow { flex: 1; }
-
-.cover-flag {
+.sect-flag {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 5px 11px;
+  padding: 5px 12px;
   border-radius: 999px;
   font-size: 12px;
   font-weight: 600;
@@ -467,122 +464,212 @@ button {
   color: var(--dim);
 }
 
-.cover-flag.warn { background: var(--amber-bg); color: var(--amber); }
-.cover-flag.bad { background: var(--red-bg); color: var(--red); }
-.cover-flag.good { background: var(--green-bg); color: var(--green); }
+.sect-flag.warn { background: var(--amber-bg); color: var(--amber); }
+.sect-flag.bad { background: var(--red-bg); color: var(--red); }
+.sect-flag.good { background: var(--green-bg); color: var(--green); }
 
-/* The journey reads left-to-right in both languages, like a departure board. */
-.cover-journey {
-  direction: ltr;
-  display: flex;
-  align-items: center;
-  gap: 18px;
-  padding: 20px 22px;
-  background: var(--panel);
-  border: 1px solid var(--line-solid);
-  border-radius: var(--radius);
-}
-
-.cover-end {
-  flex: none;
-  text-align: center;
-  min-width: 118px;
-}
-
-.cover-icao {
-  display: block;
-  font-family: var(--mono);
-  font-size: 40px;
-  font-weight: 700;
-  line-height: 1;
-  letter-spacing: -0.02em;
-}
-
-.cover-city {
-  display: block;
-  margin-block-start: 6px;
-  font-size: 11.5px;
-  color: var(--dim);
-}
-
-.cover-when {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  margin-block-start: 9px;
-  font-family: var(--mono);
-  font-size: 15px;
-  font-weight: 600;
-}
-
-.cover-when-label {
-  font-family: var(--sans);
-  font-size: 10px;
-  font-weight: 400;
-  color: var(--dimmer);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.cover-path {
-  flex: 1;
-  min-width: 80px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-}
-
-.cover-level {
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--blue);
-  white-space: nowrap;
-}
-
-.cover-line {
-  position: relative;
-  width: 100%;
-  height: 1px;
-  background: var(--line-solid);
-}
-
-.cover-plane {
-  position: absolute;
-  inset-inline-start: 50%;
-  inset-block-start: 50%;
-  transform: translate(-50%, -50%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  background: var(--panel);
-  border: 1px solid var(--line-solid);
-  color: var(--dim);
-}
-
-.cover-sub {
-  font-size: 11px;
-  color: var(--dimmer);
-  white-space: nowrap;
-}
-
-/* map */
-
-.cover-map {
+.sect-body {
   background: var(--panel);
   border: 1px solid var(--line-solid);
   border-radius: var(--radius);
   overflow: hidden;
 }
 
+.sect-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1px;
+  background: var(--line-solid);
+  border-block-start: 1px solid var(--line-solid);
+}
+
+.sect-field {
+  background: var(--panel);
+  padding: 12px 15px;
+}
+
+.sect-field .k {
+  display: block;
+  font-size: 10.5px;
+  color: var(--dimmer);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.sect-field .v {
+  display: block;
+  margin-block-start: 4px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.sect-field .raw-wx { margin-block-start: 7px; }
+
+/* ------------------------------------------------------------ cover page */
+
+/*
+ * The overview chapter is a fixed composition rather than a card wall, so it
+ * sits outside `.grid` and the masonry pass entirely.
+ */
+.cover {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* schedule band */
+
+.sched { padding: 20px 22px 14px; }
+
+.sched-top {
+  direction: ltr;
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.sched-port { min-width: 0; }
+.sched-port.end { text-align: end; margin-inline-start: auto; }
+
+.sched-port b {
+  display: block;
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.01em;
+}
+
+.sched-port span {
+  display: block;
+  margin-block-start: 5px;
+  font-size: 10.5px;
+  color: var(--dimmer);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.sched-callsign {
+  align-self: center;
+  font-size: 19px;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+
+/*
+ * The curve is schematic, so it stretches to the panel rather than keeping
+ * its ratio -- that also makes every marker position a stable percentage of
+ * the box, which is how the dots and labels stay pinned to it.
+ */
+.sched-graph {
+  position: relative;
+  direction: ltr;
+  height: 150px;
+  margin-block-start: 4px;
+}
+
+.sched-graph svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.sched-curve {
+  fill: none;
+  stroke: var(--blue);
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+
+.sched-dot {
+  position: absolute;
+  left: var(--x);
+  top: var(--y);
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--blue);
+  transform: translate(-50%, -50%);
+}
+
+.sched-duration {
+  position: absolute;
+  left: 50%;
+  top: 2px;
+  transform: translateX(-50%);
+  font-size: 12.5px;
+  color: var(--dim);
+}
+
+.sched-facts {
+  position: absolute;
+  left: 50%;
+  top: 42%;
+  transform: translateX(-50%);
+  text-align: center;
+  white-space: nowrap;
+}
+
+.sched-facts div {
+  font-size: 11.5px;
+  line-height: 1.65;
+}
+
+.sched-facts span {
+  color: var(--dimmer);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  margin-inline-end: 7px;
+}
+
+.sched-facts b {
+  font-family: var(--mono);
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.sched-marks {
+  position: relative;
+  direction: ltr;
+  height: 42px;
+}
+
+.sched-mark {
+  position: absolute;
+  left: var(--x);
+  transform: translateX(-50%);
+  text-align: center;
+}
+
+.sched-mark i {
+  display: block;
+  font-style: normal;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--dim);
+  letter-spacing: 0.06em;
+}
+
+.sched-mark b {
+  display: block;
+  margin-block-start: 2px;
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+/* map */
+
+.cover-map { border-block-end: 1px solid var(--line-solid); }
+
 .cover-map-tabs {
   display: flex;
   gap: 6px;
-  padding: 9px 13px;
+  padding: 10px 14px;
   background: var(--panel-2);
   border-block-end: 1px solid var(--line-solid);
 }
@@ -591,18 +678,18 @@ button {
   display: block;
   width: 100%;
   height: auto;
-  background: #0a0e15;
+  background: var(--inset);
 }
 
-.ov-grid { stroke: rgba(255, 255, 255, 0.05); stroke-width: 1; }
+.ov-grid { stroke: rgba(255, 255, 255, 0.055); stroke-width: 1; }
 .ov-track { fill: none; stroke: var(--blue); stroke-width: 2; stroke-linejoin: round; }
 .ov-fix { fill: var(--dimmer); }
-.ov-port { fill: #0a0e15; stroke: var(--green); stroke-width: 2.5; }
-.ov-altn { fill: #0a0e15; stroke: var(--dim); stroke-width: 2; }
+.ov-port { fill: var(--inset); stroke: var(--green); stroke-width: 2.5; }
+.ov-altn { fill: var(--inset); stroke: var(--dim); stroke-width: 2; }
 .ov-label { fill: var(--text); font-family: var(--mono); font-size: 13px; }
 .ov-label.alt { fill: var(--dim); font-size: 11px; }
 
-.cover-chart.padded { padding: 11px 13px; }
+.cover-chart.padded { padding: 12px 14px; }
 
 .cover-chart img {
   display: block;
@@ -624,162 +711,122 @@ button {
 .cover-chart[data-failed] img { display: none; }
 .cover-chart[data-failed] .cover-chart-fallback { display: block; }
 
-/* numbers */
+/* airports */
 
-.cover-numbers {
+.apt-list { display: flex; flex-direction: column; }
+
+.apt-row {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-  gap: 1px;
-  background: var(--line-solid);
-  border: 1px solid var(--line-solid);
-  border-radius: var(--radius);
-  overflow: hidden;
+  grid-template-columns: minmax(120px, 1fr) minmax(0, 2fr) minmax(150px, 1.2fr);
+  align-items: center;
+  gap: 14px;
+  padding: 13px 15px;
+  border-block-end: 1px solid var(--line-solid);
 }
 
-.cover-cell {
-  background: var(--panel);
-  padding: 12px 14px;
+.apt-row:last-child { border-block-end: none; }
+
+.apt-id {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
 }
 
-.cover-cell .k {
+.apt-id b {
+  display: block;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.apt-id span {
   display: block;
   font-size: 10.5px;
   color: var(--dimmer);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
 }
 
-.cover-cell .v {
-  display: block;
-  margin-block-start: 3px;
-  font-family: var(--mono);
-  font-size: 24px;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-}
-
-.cover-cell .v i {
-  font-style: normal;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--dim);
-  margin-inline-start: 3px;
-}
-
-/* runways */
-
-.cover-runways {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 1px;
-  background: var(--line-solid);
-  border: 1px solid var(--line-solid);
-  border-radius: var(--radius);
-  overflow: hidden;
-}
-
-.cover-rwy {
+.apt-wx {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 11px;
-  background: var(--panel);
-  padding: 12px 14px;
-}
-
-.cover-rwy-role {
-  font-size: 10.5px;
-  color: var(--dimmer);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  min-width: 62px;
-}
-
-.cover-rwy-id {
-  font-family: var(--mono);
-  font-size: 26px;
-  font-weight: 700;
-  color: var(--blue);
-  letter-spacing: -0.01em;
-}
-
-.cover-rwy-wind {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 12px;
-  font-size: 11.5px;
-  color: var(--dim);
-}
-
-.cover-rwy-wind b {
-  font-family: var(--mono);
-  font-size: 13px;
-}
-
-.cover-rwy-wind .good { color: var(--green); }
-.cover-rwy-wind .warn { color: var(--amber); }
-.cover-rwy-wind .bad { color: var(--red); }
-
-/* weather */
-
-.cover-wx {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
-  gap: 1px;
-  background: var(--line-solid);
-  border: 1px solid var(--line-solid);
-  border-radius: var(--radius);
-  overflow: hidden;
-}
-
-.cover-wx-cell {
-  background: var(--panel);
-  padding: 12px 14px;
-}
-
-.cover-wx-top {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  flex-wrap: wrap;
-}
-
-.cover-wx-top .icao {
-  font-family: var(--mono);
-  font-size: 15px;
-  font-weight: 700;
-}
-
-.cover-wx-top .role {
-  font-size: 10.5px;
+  gap: 6px 15px;
   color: var(--dimmer);
 }
 
-.cover-wx-figs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px 14px;
-  margin-block-start: 9px;
-  font-size: 11.5px;
-  color: var(--dimmer);
-}
-
-.cover-wx-figs span {
+.apt-wx > span {
   display: inline-flex;
   align-items: center;
   gap: 5px;
+  font-size: 11.5px;
 }
 
-.cover-wx-figs b {
+.apt-wx b {
   font-family: var(--mono);
   font-size: 12.5px;
   font-weight: 600;
   color: var(--dim);
 }
 
-@media (max-width: 640px) {
-  .cover-journey { gap: 12px; padding: 16px 14px; }
-  .cover-icao { font-size: 30px; }
-  .cover-end { min-width: 92px; }
+.apt-rwy {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-wrap: wrap;
+}
+
+.apt-rwy .k {
+  font-size: 10px;
+  color: var(--dimmer);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.apt-rwy > b {
+  font-family: var(--mono);
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--blue);
+}
+
+.apt-rwy-wind {
+  display: flex;
+  flex-direction: column;
+  font-size: 10.5px;
+  color: var(--dim);
+}
+
+.apt-rwy-wind i { font-style: normal; }
+.apt-rwy-wind .good { color: var(--green); }
+.apt-rwy-wind .warn { color: var(--amber); }
+.apt-rwy-wind .bad { color: var(--red); }
+
+@media (max-width: 760px) {
+  .sched { padding: 16px 14px 12px; }
+  .sched-port b { font-size: 22px; }
+  .sched-callsign { font-size: 15px; }
+  .sched-graph { height: 112px; }
+  .sched-facts { font-size: 10.5px; }
+
+  /* Five markers pinned to curve positions collide at phone width, so they
+     drop out of absolute positioning into an evenly spaced row. The dots stay
+     on the curve; the row below reads left-to-right in the same order. */
+  .sched-marks {
+    display: flex;
+    justify-content: space-between;
+    gap: 4px;
+    height: auto;
+    padding-block-start: 10px;
+  }
+
+  .sched-mark {
+    position: static;
+    transform: none;
+  }
+
+  .sched-mark i { font-size: 9.5px; letter-spacing: 0.03em; }
+  .sched-mark b { font-size: 11.5px; }
+
+  .apt-row { grid-template-columns: 1fr; gap: 9px; }
 }
 
 /* --------------------------------------------------------- flight glance */
@@ -1220,7 +1267,7 @@ button {
   font-family: var(--mono);
   font-size: 12.5px;
   line-height: 1.6;
-  background: #0a0e15;
+  background: var(--inset);
   border: 1px solid var(--line-solid);
   border-radius: var(--radius-sm);
   padding: 9px 11px;
@@ -1242,7 +1289,7 @@ button {
 }
 
 .taf-group {
-  background: #0a0e15;
+  background: var(--inset);
   padding: 8px 11px;
   font-family: var(--mono);
   font-size: 12.5px;
@@ -1418,7 +1465,7 @@ button {
   display: block;
 }
 
-.rw-surface { fill: #1b2433; stroke: var(--line-solid); }
+.rw-surface { fill: #17506a; stroke: var(--line-solid); }
 .rw-used { fill: rgba(79, 168, 255, 0.35); }
 .rw-margin-ok { fill: rgba(58, 212, 138, 0.4); }
 .rw-margin-bad { fill: rgba(255, 92, 102, 0.45); }
@@ -1687,7 +1734,7 @@ table.rw-table tr.planned td:first-child {
   inset: 0;
   display: grid;
   place-items: center;
-  background: radial-gradient(circle at 50% 30%, #131c2b, #05080d 70%);
+  background: radial-gradient(circle at 50% 30%, #12384c, #061a26 70%);
   padding: 24px;
   z-index: 20;
 }
@@ -1728,7 +1775,7 @@ table.rw-table tr.planned td:first-child {
   padding: 12px 14px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--line-solid);
-  background: #0a0e15;
+  background: var(--inset);
   color: var(--text);
   font-family: var(--mono);
   font-size: 16px;

@@ -1,10 +1,13 @@
 /**
  * Chapter 0 — Overview.
  *
- * The cover page. Everything here answers "where am I flying, when, and is
- * anything wrong" before the crew opens a single phase chapter. It stays out
- * of the masonry grid on purpose: this page is a fixed composition read
- * top-to-bottom, not a wall of independent cards.
+ * Laid out the way an airline EFB briefing opens: named sections (Schedule,
+ * Route, Airports) with the title above the panel rather than inside a card
+ * header, and a schedule band that draws the flight as a climb/cruise/descent
+ * profile with the milestone times sitting on it.
+ *
+ * It stays out of the masonry grid on purpose -- this page is a fixed
+ * composition read top to bottom, not a wall of independent cards.
  */
 
 import { t } from '../i18n.js';
@@ -17,94 +20,176 @@ import {
   describeWind,
   categoryClass
 } from '../decode.js';
-import { icon, categoryDot } from '../ui.js';
+import { icon, categoryDot, section } from '../ui.js';
 import { dominantCruiseAltitude } from './cruise.js';
 import { SEVERITY } from '../analyze.js';
 
 export default function renderOverview({ model, findings }) {
   const critical = findings.filter((f) => f.severity === SEVERITY.CRITICAL).length;
-  const units = model.units === 'lbs' ? 'lb' : 'kg';
+
+  const watch = findings.length
+    ? `<span class="sect-flag ${critical ? 'bad' : 'warn'}">
+         ${icon('obstacle', { size: 14 })}${findings.length} ${escapeHtml(t('sum.watchItems'))}
+       </span>`
+    : `<span class="sect-flag good">${icon('info', { size: 14 })}${escapeHtml(t('sum.clean'))}</span>`;
 
   return `
     <div class="cover">
-      ${identityBar(model, findings, critical)}
-      ${journey(model)}
-      ${mapBlock(model)}
-      ${numbersStrip(model, units)}
-      ${runwayStrip(model)}
-      ${weatherStrip(model)}
+      ${section(t('ov.schedule'), 'clock', scheduleBand(model), { action: watch })}
+      ${section(t('common.route'), 'routeSwap', routeBody(model))}
+      ${section(t('ov.airports'), 'headset', airportsBody(model))}
     </div>
   `;
 }
 
-/* ------------------------------------------------------------- identity */
+/* ------------------------------------------------------------- schedule */
 
-function identityBar(model, findings, critical) {
-  const f = model.flight;
-  const badge = findings.length
-    ? `<span class="cover-flag ${critical ? 'bad' : 'warn'}">
-         ${icon('obstacle', { size: 14 })}${findings.length} ${escapeHtml(t('sum.watchItems'))}
-       </span>`
-    : `<span class="cover-flag good">${icon('info', { size: 14 })}${escapeHtml(t('sum.clean'))}</span>`;
+/*
+ * Curve geometry, in viewBox units. The shape is schematic -- it says
+ * "ground, climb, cruise, descend, ground", not "this is the vertical
+ * profile" -- so it stretches with the panel rather than preserving ratio.
+ */
+const VB_W = 900;
+const VB_H = 150;
+const GROUND_Y = 112;
+const CRUISE_Y = 30;
+const CLIMB_START = 235;
+const DESCENT_END = 705;
+const MARK_STEP = 68;
 
-  return `<div class="cover-id">
-    <span class="cover-callsign ltr">${escapeHtml(f.callsign || f.number || '')}</span>
-    <span class="cover-type ltr">${escapeHtml([f.aircraftIcao, f.registration].filter(Boolean).join(' · '))}</span>
-    <span class="grow"></span>
-    ${badge}
-  </div>`;
-}
-
-/* -------------------------------------------------------------- journey */
+const pct = (value, total) => `${((value / total) * 100).toFixed(2)}%`;
 
 /**
- * The two ends of the flight at full size with the route between them.
- * Reads left-to-right in both languages, the way a departure board does.
+ * The schedule band: both airports, the profile curve, and the times a crew
+ * is held to. Out-blocks/off/on/in are what the plan is measured against, so
+ * they sit on the curve at the point of the flight they belong to rather than
+ * in a table somewhere below.
  */
-function journey(model) {
+function scheduleBand(model) {
+  const times = model.times;
   const cruiseAlt = dominantCruiseAltitude(model) || model.flight.initialAltitude;
-  const enroute = model.times.estTimeEnroute ?? model.times.estBlock;
+  const units = model.units === 'lbs' ? 'lb' : 'kg';
 
-  const end = (airport, timeLabel, time) => `
-    <div class="cover-end">
-      <span class="cover-icao ltr">${escapeHtml(airport?.icao || '—')}</span>
-      <span class="cover-city">${escapeHtml(cityOf(airport))}</span>
-      <span class="cover-when">
-        ${categoryDot(airport?.metarCategory)}
-        <span class="ltr">${escapeHtml(fmtZulu(time))}</span>
-        <span class="cover-when-label">${escapeHtml(timeLabel)}</span>
-      </span>
-    </div>`;
+  // Ground milestones, ordered outward from the takeoff/landing moment.
+  const before = [
+    { key: 'std', time: times.schedOut },
+    { key: 'etd', time: times.estOut },
+    { key: 'etot', time: times.estOff }
+  ].filter((m) => m.time);
 
-  return `<div class="cover-journey">
-    ${end(model.origin, t('header.etd'), model.times.estOff || model.times.schedOff)}
+  const after = [
+    { key: 'eta', time: times.estOn },
+    { key: 'sta', time: times.estIn || times.schedIn }
+  ].filter((m) => m.time);
 
-    <div class="cover-path">
-      <span class="cover-level ltr">${cruiseAlt ? `FL${Math.round(cruiseAlt / 100)}` : '—'}${
-        model.flight.costIndex === null || model.flight.costIndex === undefined ? '' : ` · CI ${model.flight.costIndex}`
-      }</span>
-      <span class="cover-line"><span class="cover-plane">${icon('aircraft', { size: 13 })}</span></span>
-      <span class="cover-sub ltr">${fmtDuration(enroute)} · ${fmtNumber(model.route.distance)} nm</span>
+  before.forEach((m, i) => {
+    m.x = CLIMB_START - (before.length - 1 - i) * MARK_STEP;
+  });
+  after.forEach((m, i) => {
+    m.x = DESCENT_END + i * MARK_STEP;
+  });
+
+  const marks = [...before, ...after];
+
+  // Position rides a custom property rather than `left` directly, so the
+  // narrow-screen rule can drop the markers into an evenly spaced row by
+  // switching to static positioning -- five labels pinned to curve positions
+  // collide on a phone. Physical, not logical: the curve runs departure to
+  // arrival left-to-right in every language (its containers force LTR), so a
+  // logical inset would mirror a marker away from its own dot in RTL.
+  const dots = marks
+    .map((m) => `<span class="sched-dot" style="--x:${pct(m.x, VB_W)};--y:${pct(GROUND_Y, VB_H)}"></span>`)
+    .join('');
+
+  const labels = marks
+    .map(
+      (m) => `<span class="sched-mark" style="--x:${pct(m.x, VB_W)}">
+        <i>${escapeHtml(t(`ov.${m.key}`))}</i>
+        <b class="ltr">${escapeHtml(fmtZulu(m.time))}</b>
+      </span>`
+    )
+    .join('');
+
+  const path =
+    `M0,${GROUND_Y} L${CLIMB_START},${GROUND_Y} ` +
+    `C${CLIMB_START + 55},${GROUND_Y} ${CLIMB_START + 65},${CRUISE_Y} ${CLIMB_START + 105},${CRUISE_Y} ` +
+    `L${DESCENT_END - 105},${CRUISE_Y} ` +
+    `C${DESCENT_END - 65},${CRUISE_Y} ${DESCENT_END - 55},${GROUND_Y} ${DESCENT_END},${GROUND_Y} ` +
+    `L${VB_W},${GROUND_Y}`;
+
+  const fact = (label, value) =>
+    `<div><span>${escapeHtml(label)}</span><b class="ltr">${value}</b></div>`;
+
+  return `<div class="sched">
+    <div class="sched-top">
+      ${port(model.origin, 'start')}
+      <span class="sched-callsign ltr">${escapeHtml(model.flight.callsign || model.flight.number || '')}</span>
+      ${port(model.destination, 'end')}
     </div>
 
-    ${end(model.destination, t('dep.landingTime'), model.times.estOn || model.times.schedOn)}
+    <div class="sched-graph">
+      <svg viewBox="0 0 ${VB_W} ${VB_H}" preserveAspectRatio="none" aria-hidden="true">
+        <path class="sched-curve" d="${path}"/>
+      </svg>
+      <span class="sched-duration ltr">${fmtDuration(times.estTimeEnroute ?? times.estBlock)}</span>
+      <div class="sched-facts">
+        ${fact(t('sum.blockFuel'), `${fmtNumber(model.fuel.planRamp)} ${units}`)}
+        ${fact(t('ov.groundDistance'), `${fmtNumber(model.route.distance)} nm`)}
+        ${fact(t('dep.cruiseAlt'), cruiseAlt ? `FL${Math.round(cruiseAlt / 100)}` : '—')}
+      </div>
+      ${dots}
+    </div>
+
+    <div class="sched-marks">${labels}</div>
   </div>`;
 }
 
-/** SimBrief names airports "CITY/FIELD NAME"; the first part is the city. */
-function cityOf(airport) {
-  const name = airport?.name || '';
-  return name.split('/')[0].trim();
+function port(airport, side) {
+  if (!airport) return '<span></span>';
+  const iata = airport.iata ? `${airport.iata} - ` : '';
+  return `<div class="sched-port ${side}">
+    <b class="ltr">${escapeHtml(airport.icao || '—')}</b>
+    <span>${escapeHtml(`${iata}${airport.name || ''}`)}</span>
+  </div>`;
 }
 
-/* ------------------------------------------------------------------ map */
+/* ----------------------------------------------------------------- route */
+
+function routeBody(model) {
+  const map = mapBlock(model);
+  const text = model.route.text || model.route.flightplanText;
+
+  return `
+    ${map}
+    ${
+      text
+        ? `<div class="sect-field">
+             <span class="k">${escapeHtml(t('dep.atcPlan'))}</span>
+             <div class="raw-wx">${escapeHtml(text)}</div>
+           </div>`
+        : ''
+    }
+    <div class="sect-fields">
+      ${field(t('to.sid'), model.route.sid)}
+      ${field(t('des.star'), model.route.star)}
+      ${field(t('sum.airDistance'), model.route.airDistance ? `${fmtNumber(model.route.airDistance)} nm` : null)}
+      ${field(t('crz.firs'), model.route.firs.join(' · '))}
+    </div>
+  `;
+}
+
+function field(label, value) {
+  return `<div class="sect-field">
+    <span class="k">${escapeHtml(label)}</span>
+    <span class="v ltr">${value ? escapeHtml(value) : '—'}</span>
+  </div>`;
+}
 
 function mapBlock(model) {
   const track = trackSvg(model);
   const chart = model.images.route;
   if (!track && !chart) return '';
 
-  // With only one of the two available there is nothing to switch between.
   if (!chart) return `<div class="cover-map">${track}</div>`;
   if (!track) return `<div class="cover-map">${chartPane(chart, false)}</div>`;
 
@@ -180,7 +265,7 @@ function trackSvg(model) {
 
   // Height follows the route's own shape so a wide, shallow crossing doesn't
   // sit in a tall frame of empty space. Clamped so a near-north/south route
-  // can't produce a absurdly tall panel either.
+  // can't produce an absurdly tall panel either.
   const H = Math.round(Math.min(460, Math.max(190, (W - pad * 2) * (spanY / spanX) + pad * 2)));
 
   const scale = Math.min((W - pad * 2) / spanX, (H - pad * 2) / spanY);
@@ -211,7 +296,7 @@ function trackSvg(model) {
 
   return `<div class="cover-track">
     <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${escapeHtml(`${first.ident || ''} ${last.ident || ''}`)}">
-      ${graticule(all, X, Y, minX, maxX, minY, maxY, squeeze, W, H)}
+      ${graticule(X, Y, minX, maxX, minY, maxY, squeeze, W, H)}
       <path class="ov-track" d="${track}"/>
       ${dots}
       ${endpoint(first, first.ident || '')}
@@ -222,14 +307,13 @@ function trackSvg(model) {
 }
 
 /** Whole-degree grid at a step that yields a handful of lines, not a mesh. */
-function graticule(all, X, Y, minX, maxX, minY, maxY, squeeze, W, H) {
+function graticule(X, Y, minX, maxX, minY, maxY, squeeze, W, H) {
   const latSpan = maxY - minY;
   const lonSpan = (maxX - minX) / squeeze;
   const step = (span) => [1, 2, 5, 10, 20, 30].find((s) => span / s <= 6) || 30;
 
   const latStep = step(latSpan);
   const lonStep = step(lonSpan);
-
   const lines = [];
 
   const latFrom = Math.ceil(-maxY / latStep) * latStep;
@@ -238,7 +322,7 @@ function graticule(all, X, Y, minX, maxX, minY, maxY, squeeze, W, H) {
     if (y > 2 && y < H - 2) lines.push(`<line class="ov-grid" x1="0" y1="${y.toFixed(1)}" x2="${W}" y2="${y.toFixed(1)}"/>`);
   }
 
-  const lonFrom = Math.ceil(minX / squeeze / lonStep) * lonStep;
+  const lonFrom = Math.ceil((minX / squeeze) / lonStep) * lonStep;
   for (let lon = lonFrom; lon * squeeze <= maxX; lon += lonStep) {
     const x = X({ lat: 0, lon });
     if (x > 2 && x < W - 2) lines.push(`<line class="ov-grid" x1="${x.toFixed(1)}" y1="0" x2="${x.toFixed(1)}" y2="${H}"/>`);
@@ -247,96 +331,71 @@ function graticule(all, X, Y, minX, maxX, minY, maxY, squeeze, W, H) {
   return lines.join('');
 }
 
-/* -------------------------------------------------------------- numbers */
+/* -------------------------------------------------------------- airports */
 
-function numbersStrip(model, units) {
-  const cell = (label, value, unit = '') =>
-    `<div class="cover-cell">
-       <span class="k">${escapeHtml(label)}</span>
-       <span class="v ltr">${value}${unit ? `<i>${escapeHtml(unit)}</i>` : ''}</span>
-     </div>`;
+/**
+ * One row per airport: weather and the planned runway together, because the
+ * runway is what the wind figures are about.
+ */
+function airportsBody(model) {
+  const rows = [
+    { airport: model.origin, role: t('nav.departure'), tlr: model.tlr.takeoff },
+    { airport: model.destination, role: t('nav.arrival'), tlr: model.tlr.landing },
+    ...model.alternates.map((a) => ({ airport: a, role: t('arr.alternate'), tlr: null }))
+  ].filter((r) => r.airport);
 
-  return `<div class="cover-numbers">
-    ${cell(t('dep.pax'), fmtNumber(model.weights.paxCount))}
-    ${cell(t('sum.blockFuel'), fmtNumber(model.fuel.planRamp), units)}
-    ${cell(t('sum.blockTime'), fmtDuration(model.times.estBlock))}
-    ${cell(t('dep.tow'), fmtNumber(model.weights.estTow), units)}
+  return `<div class="apt-list">${rows.map(airportRow).join('')}</div>`;
+}
+
+function airportRow({ airport, role, tlr }) {
+  const m = airport.metar ? parseMetar(airport.metar) : null;
+  const visibility = m?.cavok || m?.visibility?.unlimited
+    ? '10+ km'
+    : m?.visibility?.metres
+    ? `${fmtNumber(m.visibility.metres)} m`
+    : '—';
+
+  const runway = tlr?.runways?.find((r) => r.identifier === tlr.plannedRunway) || tlr?.runways?.[0];
+  const ident = tlr?.plannedRunway || runway?.identifier || airport.plannedRunway;
+  const headwind = runway?.headwind;
+  const crosswind = runway?.crosswind;
+  const tail = Number.isFinite(headwind) && headwind < 0;
+
+  return `<div class="apt-row">
+    <div class="apt-id">
+      ${categoryDot(airport.metarCategory)}
+      <div>
+        <b class="ltr">${escapeHtml(airport.icao)}</b>
+        <span>${escapeHtml(role)}</span>
+      </div>
+    </div>
+
+    <div class="apt-wx">
+      <span>${icon('wind', { size: 14 })}<b class="ltr">${escapeHtml(m ? describeWind(m.wind) : '—')}</b></span>
+      <span>${icon('visibility', { size: 14 })}<b class="ltr">${escapeHtml(visibility)}</b></span>
+      <span>${icon('temperature', { size: 14 })}<b class="ltr">${m && m.temperature !== null ? `${m.temperature}°` : '—'}</b></span>
+      ${
+        airport.metarCategory
+          ? `<span class="chip ${categoryClass(airport.metarCategory)}">${escapeHtml(airport.metarCategory.toUpperCase())}</span>`
+          : ''
+      }
+    </div>
+
+    ${
+      ident
+        ? `<div class="apt-rwy">
+             <span class="k">${escapeHtml(t('common.runway'))}</span>
+             <b class="ltr">${escapeHtml(ident)}</b>
+             ${
+               Number.isFinite(headwind) || Number.isFinite(crosswind)
+                 ? `<span class="apt-rwy-wind">
+                      ${Number.isFinite(headwind) ? `<i class="${tail ? 'bad' : 'good'}">${escapeHtml(tail ? t('to.tailwind') : t('to.headwind'))} ${Math.abs(headwind)}</i>` : ''}
+                      ${Number.isFinite(crosswind) ? `<i class="${crosswind >= 25 ? 'bad' : crosswind >= 15 ? 'warn' : ''}">${escapeHtml(t('to.crosswind'))} ${crosswind}</i>` : ''}
+                    </span>`
+                 : ''
+             }
+           </div>`
+        : '<div class="apt-rwy"></div>'
+    }
   </div>`;
-}
-
-/* -------------------------------------------------------------- runways */
-
-/** Planned runway at each end, with the wind the plan was built on. */
-function runwayStrip(model) {
-  const side = (tlr, fallbackRunway, role) => {
-    const runway = tlr?.runways?.find((r) => r.identifier === tlr.plannedRunway) || tlr?.runways?.[0];
-    const ident = tlr?.plannedRunway || runway?.identifier || fallbackRunway;
-    if (!ident) return '';
-
-    const headwind = runway?.headwind;
-    const crosswind = runway?.crosswind;
-    const tail = Number.isFinite(headwind) && headwind < 0;
-
-    return `<div class="cover-rwy">
-      <span class="cover-rwy-role">${escapeHtml(role)}</span>
-      <span class="cover-rwy-id ltr">${escapeHtml(ident)}</span>
-      <span class="cover-rwy-wind">
-        ${
-          Number.isFinite(headwind)
-            ? `<span class="${tail ? 'bad' : 'good'}">${escapeHtml(tail ? t('to.tailwind') : t('to.headwind'))} <b class="ltr">${Math.abs(headwind)}</b></span>`
-            : ''
-        }
-        ${
-          Number.isFinite(crosswind)
-            ? `<span class="${crosswind >= 25 ? 'bad' : crosswind >= 15 ? 'warn' : ''}">${escapeHtml(t('to.crosswind'))} <b class="ltr">${crosswind}</b></span>`
-            : ''
-        }
-      </span>
-    </div>`;
-  };
-
-  const departure = side(model.tlr.takeoff, model.origin?.plannedRunway, t('nav.departure'));
-  const arrival = side(model.tlr.landing, model.destination?.plannedRunway, t('nav.arrival'));
-  if (!departure && !arrival) return '';
-
-  return `<div class="cover-runways">${departure}${arrival}</div>`;
-}
-
-/* -------------------------------------------------------------- weather */
-
-function weatherStrip(model) {
-  const entries = [
-    { airport: model.origin, role: t('nav.departure') },
-    { airport: model.destination, role: t('nav.arrival') },
-    ...model.alternates.map((a) => ({ airport: a, role: t('arr.alternate') }))
-  ].filter((e) => e.airport);
-
-  return `<div class="cover-wx">${entries
-    .map(({ airport, role }) => {
-      const m = airport.metar ? parseMetar(airport.metar) : null;
-      const visibility = m?.cavok || m?.visibility?.unlimited
-        ? '10+ km'
-        : m?.visibility?.metres
-        ? `${fmtNumber(m.visibility.metres)} m`
-        : '—';
-
-      return `<div class="cover-wx-cell">
-        <div class="cover-wx-top">
-          ${categoryDot(airport.metarCategory)}
-          <span class="ltr icao">${escapeHtml(airport.icao)}</span>
-          <span class="role">${escapeHtml(role)}</span>
-          ${
-            airport.metarCategory
-              ? `<span class="chip ${categoryClass(airport.metarCategory)}">${escapeHtml(airport.metarCategory.toUpperCase())}</span>`
-              : ''
-          }
-        </div>
-        <div class="cover-wx-figs">
-          <span>${icon('wind', { size: 14 })}<b class="ltr">${escapeHtml(m ? describeWind(m.wind) : '—')}</b></span>
-          <span>${icon('visibility', { size: 14 })}<b class="ltr">${escapeHtml(visibility)}</b></span>
-          <span>${icon('temperature', { size: 14 })}<b class="ltr">${m && m.temperature !== null ? `${m.temperature}°` : '—'}</b></span>
-        </div>
-      </div>`;
-    })
-    .join('')}</div>`;
 }
