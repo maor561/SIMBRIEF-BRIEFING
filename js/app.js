@@ -3,7 +3,7 @@
  * delegated event handlers the views rely on.
  */
 
-import { t, setLang, toggleLang, getLang, applyDocumentLanguage } from './i18n.js';
+import { t } from './i18n.js';
 import { normalizeOfp } from './normalize.js';
 import { analyze, countByChapter, SEVERITY } from './analyze.js';
 import { escapeHtml, fmtZulu, fmtDuration } from './decode.js';
@@ -16,10 +16,10 @@ import renderNotams from './views/notams.js';
 import renderFuel from './views/fuel.js';
 import renderPerformance from './views/performance.js';
 import renderNavlog from './views/navlog.js';
+import renderAtc from './views/atc.js';
 import { buildFixDetail } from './charts.js';
 
 const STORAGE_USER = 'sbb.username';
-const STORAGE_CHAPTER = 'sbb.chapter';
 
 /*
  * Chapters are types of information, not phases of flight -- the way an
@@ -33,17 +33,20 @@ const CHAPTERS = [
   { id: 'notams', step: '2', render: renderNotams, icon: 'M12 3.6 21 19.4H3zM12 9.6v4.3M12 16.7h.01' },
   { id: 'fuel', step: '3', render: renderFuel, icon: 'M5 21V5a2 2 0 0 1 2-2h5a2 2 0 0 1 2 2v16M3 21h13M17 8l2.4 2.4a2 2 0 0 1 .6 1.4V17a1.6 1.6 0 0 0 3.2 0v-6M8 8h3' },
   { id: 'performance', step: '4', render: renderPerformance, icon: 'M3 19h18M4.5 14.5l3.5.6 9.2-8a1.7 1.7 0 0 1 2.4 2.4l-8 9.2.6 3.5-1.8-.6-1.4-3-3-1.4z' },
-  { id: 'navlog', step: '5', render: renderNavlog, icon: 'M4 8.5h14l-3.4-3.4M20 15.5H6l3.4 3.4' }
+  { id: 'atc', step: '5', render: renderAtc, icon: 'M4 15v-3a8 8 0 0 1 16 0v3M4 15a2 2 0 0 0 2 2h1.2v-5.4H6a2 2 0 0 0-2 2zM20 15a2 2 0 0 1-2 2h-1.2v-5.4H18a2 2 0 0 1 2 2zM19 17.6v.6a2.6 2.6 0 0 1-2.6 2.6H13' },
+  { id: 'navlog', step: '6', render: renderNavlog, icon: 'M4 8.5h14l-3.4-3.4M20 15.5H6l3.4 3.4' }
 ];
 
 const state = {
   raw: null,
   model: null,
   findings: [],
-  chapter: localStorage.getItem(STORAGE_CHAPTER) || 'overview',
+  chapter: 'overview',
   username: localStorage.getItem(STORAGE_USER) || '',
   demo: false,
-  loading: false
+  loading: false,
+  // Live VATSIM staffing: { state: 'loading' | 'ready' | 'error', feed }.
+  vatsim: null
 };
 
 const el = {
@@ -93,6 +96,11 @@ async function load({ username, demo = false } = {}) {
       localStorage.setItem(STORAGE_USER, username);
     }
 
+    // Every freshly loaded briefing opens on its cover, whichever chapter the
+    // last session happened to end on.
+    state.chapter = 'overview';
+    state.vatsim = null;
+
     el.overlay.hidden = true;
     el.app.hidden = false;
     render();
@@ -126,7 +134,6 @@ function showError(message) {
 /* ------------------------------------------------------------------ render */
 
 function render() {
-  applyDocumentLanguage();
   renderHeader();
   renderRail();
   renderChapter();
@@ -151,7 +158,6 @@ function renderHeader() {
     ${state.demo ? `<span class="demo-flag">${escapeHtml(t('header.demo'))}</span>` : ''}
     <div class="tools">
       <span class="clock" id="clock">${escapeHtml(fmtZulu(new Date()))}</span>
-      <button class="tool-btn lang" data-action="lang">${getLang() === 'he' ? 'EN' : 'עב'}</button>
       <button class="tool-btn" data-action="refresh" title="${escapeHtml(t('header.refresh'))}">↻</button>
     </div>
   `;
@@ -182,7 +188,12 @@ function renderRail() {
 function renderChapter({ preserveScroll = false } = {}) {
   const chapter = CHAPTERS.find((c) => c.id === state.chapter) || CHAPTERS[0];
   const scrollTop = preserveScroll ? el.content.scrollTop : 0;
-  el.content.innerHTML = chapter.render({ model: state.model, findings: state.findings });
+  el.content.innerHTML = chapter.render({
+    model: state.model,
+    findings: state.findings,
+    vatsim: state.vatsim
+  });
+  if (chapter.id === 'atc') ensureVatsim();
   // Masonry moves card nodes into freshly built row/column wrappers, so it
   // must run on the flat list renderChapter just produced -- calling it
   // again on an already-laid-out tree would nest wrappers instead of
@@ -190,7 +201,36 @@ function renderChapter({ preserveScroll = false } = {}) {
   // NOTAM filter below) goes through a full renderChapter, not a DOM patch.
   layoutMasonry(el.content);
   el.content.scrollTop = scrollTop;
-  localStorage.setItem(STORAGE_CHAPTER, state.chapter);
+}
+
+/** Briefly swaps a button's label to confirm what just happened. */
+function flash(button, message) {
+  const original = button.innerHTML;
+  button.textContent = message;
+  setTimeout(() => {
+    button.innerHTML = original;
+  }, 1600);
+}
+
+/**
+ * Fetches VATSIM staffing the first time the ATC chapter is opened, then
+ * re-renders once it lands. The guard on `state.chapter` matters: the fetch
+ * takes a moment and the reader may have moved on by the time it resolves,
+ * in which case repainting would yank them back.
+ */
+async function ensureVatsim() {
+  if (state.vatsim) return;
+  state.vatsim = { state: 'loading', feed: null };
+
+  try {
+    const response = await fetch('api/vatsim');
+    if (!response.ok) throw new Error(`vatsim ${response.status}`);
+    state.vatsim = { state: 'ready', feed: await response.json() };
+  } catch {
+    state.vatsim = { state: 'error', feed: null };
+  }
+
+  if (state.chapter === 'atc') renderChapter({ preserveScroll: true });
 }
 
 function goToChapter(id, findingId) {
@@ -232,11 +272,6 @@ document.addEventListener('click', (event) => {
   switch (trigger.dataset.action) {
     case 'chapter':
       goToChapter(trigger.dataset.chapter);
-      break;
-
-    case 'lang':
-      toggleLang();
-      render();
       break;
 
     case 'refresh':
@@ -306,6 +341,15 @@ document.addEventListener('click', (event) => {
     case 'notam-full':
       trigger.closest('.notam')?.classList.toggle('expanded');
       break;
+
+    case 'copy-fpl': {
+      const text = document.querySelector('[data-fpl-text]')?.textContent || '';
+      navigator.clipboard?.writeText(text).then(
+        () => flash(trigger, t('atc.copied')),
+        () => flash(trigger, t('atc.copyFailed'))
+      );
+      break;
+    }
 
     default:
       break;
@@ -380,8 +424,7 @@ el.content.addEventListener('touchend', (event) => {
   if (elapsed > 600 || Math.abs(dx) < 70 || Math.abs(dy) > 50) return;
 
   const index = CHAPTERS.findIndex((c) => c.id === state.chapter);
-  // In RTL a swipe right moves forward through the chapters.
-  const forward = getLang() === 'he' ? dx > 0 : dx < 0;
+  const forward = dx < 0;
   const next = CHAPTERS[index + (forward ? 1 : -1)];
   if (next) goToChapter(next.id);
 }, { passive: true });
@@ -391,7 +434,7 @@ document.addEventListener('keydown', (event) => {
   if (event.target.matches('input, textarea')) return;
   const index = CHAPTERS.findIndex((c) => c.id === state.chapter);
   if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') {
-    const forward = getLang() === 'he' ? event.key === 'ArrowLeft' : event.key === 'ArrowRight';
+    const forward = event.key === 'ArrowRight';
     const next = CHAPTERS[index + (forward ? 1 : -1)];
     if (next) goToChapter(next.id);
   }
@@ -436,8 +479,7 @@ addEventListener('unhandledrejection', (event) => {
   reportFatal('async', event.reason?.message || String(event.reason));
 });
 
-function applySetupLanguage() {
-  applyDocumentLanguage();
+function applySetupText() {
   document.getElementById('setup-heading').textContent = t('setup.heading');
   document.getElementById('setup-explain').textContent = t('setup.explain');
   document.getElementById('setup-label').textContent = t('setup.username');
@@ -449,7 +491,7 @@ function applySetupLanguage() {
 // Tells the inline watchdog in index.html that the module graph loaded.
 window.__briefingBooted = true;
 
-applySetupLanguage();
+applySetupText();
 
 if (state.username) {
   el.username.value = state.username;

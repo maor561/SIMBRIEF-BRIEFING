@@ -294,7 +294,7 @@ check('catches the 44 kg ZFW margin', () => {
 
 check('flags high shear points on the route', () => {
   const shearFixes = model.navlog.filter((f) => f.shear >= 4);
-  const shearFindings = findings.filter((f) => /shear|גזירת/i.test(`${f.title.he} ${f.title.en}`));
+  const shearFindings = findings.filter((f) => /shear/i.test(f.title));
   assert.equal(shearFindings.length, shearFixes.length);
   for (const f of shearFindings) {
     assert.ok(f.ident, 'shear finding names its fix');
@@ -309,9 +309,9 @@ check('collapses widespread ISA deviation into one finding', () => {
   warm.navlog.forEach((f) => {
     f.isaDev = 14;
   });
-  const isaFindings = analyze(warm).filter((f) => /ISA|תקן|standard/i.test(`${f.title.he} ${f.title.en}`));
+  const isaFindings = analyze(warm).filter((f) => /ISA|standard/i.test(f.title));
   assert.equal(isaFindings.length, 1, 'one summary finding, not one per fix');
-  assert.match(isaFindings[0].detail.en, /32/, 'states how many fixes exceeded');
+  assert.match(isaFindings[0].detail, /32/, 'states how many fixes exceeded');
 
   // An isolated pocket still gets named individually.
   const spotty = normalizeOfp(JSON.parse(JSON.stringify(raw)));
@@ -319,7 +319,7 @@ check('collapses widespread ISA deviation into one finding', () => {
     f.isaDev = 0;
   });
   spotty.navlog[5].isaDev = -16;
-  const spottyFindings = analyze(spotty).filter((f) => /ISA/i.test(`${f.title.he} ${f.title.en}`));
+  const spottyFindings = analyze(spotty).filter((f) => /ISA/i.test(f.title));
   assert.equal(spottyFindings.length, 1);
   assert.equal(spottyFindings[0].ident, spotty.navlog[5].ident);
 });
@@ -343,8 +343,8 @@ check('every finding is well formed', () => {
       ['weather', 'notams', 'fuel', 'performance', 'navlog'].includes(f.chapter),
       `bad chapter: ${f.chapter}`
     );
-    assert.ok(f.title && f.title.he && f.title.en, 'finding needs a bilingual title');
-    assert.ok(f.detail && typeof f.detail.he === 'string' && typeof f.detail.en === 'string', 'finding needs a bilingual detail');
+    assert.ok(typeof f.title === 'string' && f.title.length, 'finding needs a title');
+    assert.ok(typeof f.detail === 'string', 'finding needs a detail string');
     assert.ok(f.id, 'finding needs an id');
   }
 });

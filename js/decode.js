@@ -6,7 +6,7 @@
  * decode is worse than no decode in a briefing.
  */
 
-import { t, getLang } from './i18n.js';
+import { t } from './i18n.js';
 
 /* ------------------------------------------------------------------ format */
 
@@ -37,7 +37,7 @@ export function sanitizeNotamHtml(html) {
 
 export function fmtNumber(value, digits = 0) {
   if (value === null || value === undefined || !Number.isFinite(value)) return '—';
-  return value.toLocaleString(getLang() === 'he' ? 'he-IL' : 'en-GB', {
+  return value.toLocaleString('en-GB', {
     minimumFractionDigits: digits,
     maximumFractionDigits: digits
   });
@@ -108,7 +108,7 @@ export function decodeLimitCode(code) {
   if (!code) return null;
   const entry = LIMIT_CODES[code.toUpperCase()];
   if (!entry) return code;
-  return getLang() === 'he' ? entry.he : entry.en;
+  return entry.en;
 }
 
 const SURFACE = {
@@ -120,7 +120,7 @@ const SURFACE = {
 export function decodeSurface(value) {
   if (!value) return null;
   const entry = SURFACE[value.toLowerCase()];
-  return entry ? (getLang() === 'he' ? entry.he : entry.en) : value;
+  return entry ? entry.en : value;
 }
 
 /* -------------------------------------------------------------------- METAR */
@@ -162,7 +162,7 @@ const WX_PHENOMENA = {
 };
 
 function phrase(entry) {
-  return entry ? (getLang() === 'he' ? entry.he : entry.en) : null;
+  return entry ? entry.en : null;
 }
 
 /**

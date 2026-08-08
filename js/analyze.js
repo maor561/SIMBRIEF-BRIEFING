@@ -6,7 +6,7 @@
  * every threshold in one table makes them easy to review and tune.
  */
 
-import { t, getLang } from './i18n.js';
+import { t } from './i18n.js';
 import {
   fmtFeet,
   fmtNumber,
@@ -36,13 +36,6 @@ export const THRESHOLDS = {
   fuelMarginLow: 500
 };
 
-/**
- * Store both languages; render-time code picks the right one.
- * If we called getLang() here, the language would be frozen at creation time,
- * and toggling the language later wouldn't update the findings.
- */
-const bilingual = (he, en) => ({ he, en });
-
 function finding(severity, chapter, title, detail, extra = {}) {
   return { severity, chapter, title, detail, ...extra };
 }
@@ -60,11 +53,8 @@ function checkRouteWeather(model, findings) {
         finding(
           fix.shear >= THRESHOLDS.shear * 1.5 ? SEVERITY.CRITICAL : SEVERITY.WARNING,
           'weather',
-          bilingual(`גזירת רוח ב-${fix.ident}`, `Wind shear at ${fix.ident}`),
-          bilingual(
-            `ערך shear ${fix.shear} בגובה ${fmtFeet(fix.altitude)} — צפויה טלטלה. רוח ${fix.windDir}°/${fix.windSpd}kt.`,
-            `Shear value ${fix.shear} at ${fmtFeet(fix.altitude)} — expect turbulence. Wind ${fix.windDir}°/${fix.windSpd}kt.`
-          ),
+          `Wind shear at ${fix.ident}`,
+          `Shear value ${fix.shear} at ${fmtFeet(fix.altitude)} — expect turbulence. Wind ${fix.windDir}°/${fix.windSpd}kt.`,
           { fixIndex: fix.index, ident: fix.ident }
         )
       );
@@ -85,11 +75,8 @@ function checkRouteWeather(model, findings) {
         finding(
           SEVERITY.WARNING,
           'weather',
-          bilingual(`שינוי חד ברוח בין ${prev.ident} ל-${curr.ident}`, `Sharp wind change ${prev.ident} to ${curr.ident}`),
-          bilingual(
-            `רכיב הרוח משתנה ב-${Math.abs(delta)}kt (${prev.windComponent} ← ${curr.windComponent}). צפה לשינוי במהירות קרקע ובצריכת דלק.`,
-            `Wind component changes by ${Math.abs(delta)}kt (${prev.windComponent} to ${curr.windComponent}). Expect groundspeed and burn to shift.`
-          ),
+          `Sharp wind change ${prev.ident} to ${curr.ident}`,
+          `Wind component changes by ${Math.abs(delta)}kt (${prev.windComponent} to ${curr.windComponent}). Expect groundspeed and burn to shift.`,
           { fixIndex: curr.index, ident: curr.ident }
         )
       );
@@ -106,11 +93,8 @@ function checkRouteWeather(model, findings) {
       finding(
         SEVERITY.INFO,
         'weather',
-        bilingual(`תבליט גבוה סביב ${highestMora.ident}`, `High terrain near ${highestMora.ident}`),
-        bilingual(
-          `MORA ${fmtFeet(highestMora.mora)} — רלוונטי לגובה החזרה במקרה של ירידת לחץ או כיבוי מנוע.`,
-          `MORA ${fmtFeet(highestMora.mora)} — relevant to drift-down and depressurisation levels.`
-        ),
+        `High terrain near ${highestMora.ident}`,
+        `MORA ${fmtFeet(highestMora.mora)} — relevant to drift-down and depressurisation levels.`,
         { fixIndex: highestMora.index, ident: highestMora.ident }
       )
     );
@@ -142,11 +126,8 @@ function reportIsaDeviation(fixes, findings) {
         finding(
           SEVERITY.WARNING,
           'weather',
-          bilingual(`סטיית ISA חריגה ב-${fix.ident}`, `Large ISA deviation at ${fix.ident}`),
-          bilingual(
-            `ISA ${fixSign}${Math.abs(fix.isaDev)}°C בגובה ${fmtFeet(fix.altitude)}. משפיע על ביצועי טיפוס ותקרה.`,
-            `ISA ${fixSign}${Math.abs(fix.isaDev)}°C at ${fmtFeet(fix.altitude)}. Affects climb performance and ceiling.`
-          ),
+          `Large ISA deviation at ${fix.ident}`,
+          `ISA ${fixSign}${Math.abs(fix.isaDev)}°C at ${fmtFeet(fix.altitude)}. Affects climb performance and ceiling.`,
           { fixIndex: fix.index, ident: fix.ident }
         )
       );
@@ -158,14 +139,8 @@ function reportIsaDeviation(fixes, findings) {
     finding(
       SEVERITY.WARNING,
       'weather',
-      bilingual(
-        `אוויר ${worst.isaDev > 0 ? 'חם' : 'קר'} מהתקן לאורך רוב המסלול`,
-        `Air ${worst.isaDev > 0 ? 'warmer' : 'colder'} than standard along most of the route`
-      ),
-      bilingual(
-        `${exceeded.length} מתוך ${fixes.length} נקודות חורגות מ-${THRESHOLDS.isaDeviation}°C. השיא: ISA ${sign}${magnitude}°C ב-${worst.ident} בגובה ${fmtFeet(worst.altitude)}. משפיע על ביצועי טיפוס ועל התקרה הזמינה.`,
-        `${exceeded.length} of ${fixes.length} fixes exceed ${THRESHOLDS.isaDeviation}°C. Peak: ISA ${sign}${magnitude}°C at ${worst.ident}, ${fmtFeet(worst.altitude)}. Affects climb performance and available ceiling.`
-      ),
+      `Air ${worst.isaDev > 0 ? 'warmer' : 'colder'} than standard along most of the route`,
+      `${exceeded.length} of ${fixes.length} fixes exceed ${THRESHOLDS.isaDeviation}°C. Peak: ISA ${sign}${magnitude}°C at ${worst.ident}, ${fmtFeet(worst.altitude)}. Affects climb performance and available ceiling.`,
       { fixIndex: worst.index, ident: worst.ident }
     )
   );
@@ -188,11 +163,8 @@ function checkAirportWeather(model, findings) {
       finding(
         severity,
         chapter,
-        bilingual(`תנאי ${category.toUpperCase()} ב-${airport.icao}`, `${category.toUpperCase()} conditions at ${airport.icao}`),
-        bilingual(
-          `ראות ${fmtNumber(airport.metarVisibility)}m, תקרה ${fmtFeet(airport.metarCeiling)}. בדוק מינימות גישה.`,
-          `Visibility ${fmtNumber(airport.metarVisibility)}m, ceiling ${fmtFeet(airport.metarCeiling)}. Check approach minima.`
-        ),
+        `${category.toUpperCase()} conditions at ${airport.icao}`,
+        `Visibility ${fmtNumber(airport.metarVisibility)}m, ceiling ${fmtFeet(airport.metarCeiling)}. Check approach minima.`,
         { icao: airport.icao }
       )
     );
@@ -220,11 +192,8 @@ function checkWeights(model, findings) {
         finding(
           SEVERITY.CRITICAL,
           chapter,
-          bilingual(`חריגה ב-${label}`, `${label} exceeded`),
-          bilingual(
-            `${label} מתוכנן ${fmtWeight(est, units)} מול מקסימום ${fmtWeight(max, units)} — חריגה של ${fmtWeight(Math.abs(margin), units)}.`,
-            `Planned ${label} ${fmtWeight(est, units)} against max ${fmtWeight(max, units)} — over by ${fmtWeight(Math.abs(margin), units)}.`
-          ),
+          `${label} exceeded`,
+          `Planned ${label} ${fmtWeight(est, units)} against max ${fmtWeight(max, units)} — over by ${fmtWeight(Math.abs(margin), units)}.`,
           { margin, label }
         )
       );
@@ -233,11 +202,8 @@ function checkWeights(model, findings) {
         finding(
           margin < 100 ? SEVERITY.CRITICAL : SEVERITY.WARNING,
           chapter,
-          bilingual(`מרווח ${label} צר`, `Tight ${label} margin`),
-          bilingual(
-            `נותרו ${fmtWeight(margin, units)} בלבד עד מקסימום ${label} (${fmtWeight(max, units)}). כל תוספת מטען או דלק תחרוג.`,
-            `Only ${fmtWeight(margin, units)} left to max ${label} (${fmtWeight(max, units)}). Any added payload or fuel will exceed it.`
-          ),
+          `Tight ${label} margin`,
+          `Only ${fmtWeight(margin, units)} left to max ${label} (${fmtWeight(max, units)}). Any added payload or fuel will exceed it.`,
           { margin, label }
         )
       );
@@ -263,11 +229,8 @@ function checkFuel(model, findings) {
         finding(
           SEVERITY.CRITICAL,
           'weather',
-          bilingual('דלק מתחת למינימום בנתיב', 'Fuel below minimum enroute'),
-          bilingual(
-            `ב-${tightest.fix.ident} הדלק המתוכנן נמוך ב-${fmtWeight(Math.abs(tightest.margin), units)} מהמינימום הנדרש.`,
-            `At ${tightest.fix.ident} planned fuel is ${fmtWeight(Math.abs(tightest.margin), units)} below the required minimum.`
-          ),
+          'Fuel below minimum enroute',
+          `At ${tightest.fix.ident} planned fuel is ${fmtWeight(Math.abs(tightest.margin), units)} below the required minimum.`,
           { fixIndex: tightest.fix.index, ident: tightest.fix.ident }
         )
       );
@@ -276,11 +239,8 @@ function checkFuel(model, findings) {
         finding(
           SEVERITY.WARNING,
           'weather',
-          bilingual(`מרווח דלק צר ב-${tightest.fix.ident}`, `Tight fuel margin at ${tightest.fix.ident}`),
-          bilingual(
-            `רק ${fmtWeight(tightest.margin, units)} מעל המינימום. עיכוב או הסטה יצרכו את המרווח.`,
-            `Only ${fmtWeight(tightest.margin, units)} above minimum. A delay or reroute will eat into it.`
-          ),
+          `Tight fuel margin at ${tightest.fix.ident}`,
+          `Only ${fmtWeight(tightest.margin, units)} above minimum. A delay or reroute will eat into it.`,
           { fixIndex: tightest.fix.index, ident: tightest.fix.ident }
         )
       );
@@ -297,11 +257,8 @@ function checkFuel(model, findings) {
         finding(
           SEVERITY.CRITICAL,
           'fuel',
-          bilingual('דלק נחיתה מתחת לנדרש', 'Landing fuel below requirement'),
-          bilingual(
-            `דלק בנחיתה ${fmtWeight(model.fuel.planLanding, units)} מול ${fmtWeight(required, units)} נדרשים (רזרבה + חלופי).`,
-            `Landing fuel ${fmtWeight(model.fuel.planLanding, units)} against ${fmtWeight(required, units)} required (reserve + alternate).`
-          )
+          'Landing fuel below requirement',
+          `Landing fuel ${fmtWeight(model.fuel.planLanding, units)} against ${fmtWeight(required, units)} required (reserve + alternate).`
         )
       );
     } else if (model.fuel.avgFlow && margin / model.fuel.avgFlow < 0.25) {
@@ -309,11 +266,8 @@ function checkFuel(model, findings) {
         finding(
           SEVERITY.WARNING,
           'fuel',
-          bilingual('מעט דלק להחזקה', 'Little holding fuel'),
-          bilingual(
-            `מעבר לרזרבה ולחלופי נותרו ${fmtWeight(margin, units)} — פחות מ-15 דקות החזקה.`,
-            `Beyond reserve and alternate only ${fmtWeight(margin, units)} remains — under 15 minutes of holding.`
-          )
+          'Little holding fuel',
+          `Beyond reserve and alternate only ${fmtWeight(margin, units)} remains — under 15 minutes of holding.`
         )
       );
     }
@@ -341,11 +295,8 @@ function checkRunwayPerformance(model, findings) {
           finding(
             SEVERITY.CRITICAL,
             chapter,
-            bilingual(`רוח צד גבוהה במסלול ${runway.identifier}`, `High crosswind on runway ${runway.identifier}`),
-            bilingual(
-              `${runway.crosswind}kt רוח צד — בגבול או מעל מגבלת ההדגמה של המטוס.`,
-              `${runway.crosswind}kt crosswind — at or beyond the demonstrated limit.`
-            ),
+            `High crosswind on runway ${runway.identifier}`,
+            `${runway.crosswind}kt crosswind — at or beyond the demonstrated limit.`,
             { runway: runway.identifier }
           )
         );
@@ -354,8 +305,8 @@ function checkRunwayPerformance(model, findings) {
           finding(
             SEVERITY.WARNING,
             chapter,
-            bilingual(`רוח צד משמעותית במסלול ${runway.identifier}`, `Significant crosswind on runway ${runway.identifier}`),
-            bilingual(`${runway.crosswind}kt רוח צד. שקול טכניקת נחיתה/המראה מתאימה.`, `${runway.crosswind}kt crosswind. Plan technique accordingly.`),
+            `Significant crosswind on runway ${runway.identifier}`,
+            `${runway.crosswind}kt crosswind. Plan technique accordingly.`,
             { runway: runway.identifier }
           )
         );
@@ -368,11 +319,8 @@ function checkRunwayPerformance(model, findings) {
         finding(
           SEVERITY.CRITICAL,
           chapter,
-          bilingual(`רוח גב במסלול ${runway.identifier}`, `Tailwind on runway ${runway.identifier}`),
-          bilingual(
-            `${Math.abs(runway.headwind)}kt רוח גב — מעל מגבלת 10kt המקובלת.`,
-            `${Math.abs(runway.headwind)}kt tailwind — beyond the usual 10kt limit.`
-          ),
+          `Tailwind on runway ${runway.identifier}`,
+          `${Math.abs(runway.headwind)}kt tailwind — beyond the usual 10kt limit.`,
           { runway: runway.identifier }
         )
       );
@@ -383,11 +331,8 @@ function checkRunwayPerformance(model, findings) {
         finding(
           runway.distanceMargin < 100 ? SEVERITY.CRITICAL : SEVERITY.WARNING,
           chapter,
-          bilingual(`מרווח עצירה קצר במסלול ${runway.identifier}`, `Short stop margin on runway ${runway.identifier}`),
-          bilingual(
-            `נותרו ${fmtFeet(runway.distanceMargin)} בלבד בין מרחק העצירה לאורך המסלול הזמין.`,
-            `Only ${fmtFeet(runway.distanceMargin)} between the reject distance and available runway.`
-          ),
+          `Short stop margin on runway ${runway.identifier}`,
+          `Only ${fmtFeet(runway.distanceMargin)} between the reject distance and available runway.`,
           { runway: runway.identifier }
         )
       );
@@ -400,11 +345,8 @@ function checkRunwayPerformance(model, findings) {
           finding(
             SEVERITY.CRITICAL,
             chapter,
-            bilingual(`משקל מעל מגבלת המסלול ${runway.identifier}`, `Weight above runway ${runway.identifier} limit`),
-            bilingual(
-              `משקל מתוכנן ${fmtWeight(tlr.plannedWeight, model.units)} מול מקסימום ${fmtWeight(runway.maxWeight, model.units)}.`,
-              `Planned ${fmtWeight(tlr.plannedWeight, model.units)} against max ${fmtWeight(runway.maxWeight, model.units)}.`
-            ),
+            `Weight above runway ${runway.identifier} limit`,
+            `Planned ${fmtWeight(tlr.plannedWeight, model.units)} against max ${fmtWeight(runway.maxWeight, model.units)}.`,
             { runway: runway.identifier }
           )
         );
@@ -443,27 +385,24 @@ function checkNotams(model, findings) {
         mentionsRunway(`${notam.text || ''} ${notam.raw || ''}`, airport.plannedRunway);
 
       const title = hitsPlanned
-        ? bilingual(
-            `המסלול המתוכנן ${airport.plannedRunway} ב-${airport.icao} מושפע מ-NOTAM`,
-            `Planned runway ${airport.plannedRunway} at ${airport.icao} affected by NOTAM`
-          )
+        ? `Planned runway ${airport.plannedRunway} at ${airport.icao} affected by NOTAM`
         : severity === SEVERITY.CRITICAL
-        ? bilingual(`NOTAM קריטי ב-${airport.icao}`, `Critical NOTAM at ${airport.icao}`)
-        : bilingual(`סגירת מסלול אחר ב-${airport.icao}`, `Other runway closed at ${airport.icao}`);
+        ? `Critical NOTAM at ${airport.icao}`
+        : `Other runway closed at ${airport.icao}`;
 
       // Many closures only bite inside a daily window. We show the schedule
       // rather than trying to parse it, so the crew judges the overlap.
       const notamBody = notam.text || notam.raw || '';
       const scheduleNote = notam.schedule
-        ? { he: `\nחלון פעילות: ${notam.schedule} — ודא חפיפה לזמן הטיסה.`, en: `\nActive window: ${notam.schedule} — check the overlap with your times.` }
-        : { he: '', en: '' };
+        ? `\nActive window: ${notam.schedule} — check the overlap with your times.`
+        : '';
 
       findings.push(
         finding(
           hitsPlanned ? SEVERITY.CRITICAL : severity,
           chapter,
           title,
-          bilingual(`${notamBody}${scheduleNote.he}`, `${notamBody}${scheduleNote.en}`),
+          `${notamBody}${scheduleNote}`,
           { icao: airport.icao, notamId: notam.id }
         )
       );
