@@ -616,3 +616,64 @@ export function notamIconName(notam) {
   if (/airspace|restricted|danger|military|aerodrome|ad ltd/.test(subject)) return 'airspace';
   return 'info';
 }
+
+/**
+ * Colour-codes the hazardous tokens inside a raw METAR/TAF the way airline
+ * EFBs do: the text stays exactly as issued, but CBs, thunderstorms, low
+ * visibility and the like jump out without anyone reading the whole string.
+ * Red is "this changes the plan", amber is "this deserves a look".
+ */
+export function highlightWx(raw) {
+  if (!raw) return '';
+  return String(raw)
+    .split(/(\s+)/)
+    .map((token) => {
+      if (!token.trim()) return escapeHtml(token);
+      const cls = classifyWxToken(token.toUpperCase());
+      const escaped = escapeHtml(token);
+      return cls ? `<span class="${cls}">${escaped}</span>` : escaped;
+    })
+    .join('');
+}
+
+function classifyWxToken(token) {
+  // Convective cloud, thunder, freezing precip, hail, fog and the rare
+  // severe phenomena (squall, funnel cloud, ash, sand/dust storm).
+  if (/(FEW|SCT|BKN|OVC)\d{3}(CB|TCU)/.test(token) || token === 'CB' || token === 'TCU') return 'wx-bad';
+  if (/^(\+|-|VC)?(TS|FZ)/.test(token)) return 'wx-bad';
+  if (/^(SQ|FC|VA|SS|DS)/.test(token)) return 'wx-bad';
+  if (/^(\+|VC)?FG$/.test(token)) return 'wx-bad';
+  if (/^\+/.test(token)) return 'wx-bad'; // any heavy (+) weather group
+
+  // Visibility in metres.
+  if (/^\d{4}$/.test(token)) {
+    const metres = Number(token);
+    if (metres < 1500) return 'wx-bad';
+    if (metres < 5000) return 'wx-warn';
+    return null;
+  }
+
+  // Ceiling height.
+  const cloud = token.match(/^(BKN|OVC|VV)(\d{3})/);
+  if (cloud) {
+    const hundreds = Number(cloud[2]);
+    if (hundreds <= 4) return 'wx-bad';
+    if (hundreds <= 10) return 'wx-warn';
+    return null;
+  }
+
+  // Wind: gusts always, steady wind from 25 kt.
+  const wind = token.match(/^(\d{3}|VRB)(\d{2,3})(G(\d{2,3}))?(KT|MPS)$/);
+  if (wind) {
+    if (wind[4]) return 'wx-warn';
+    if (Number(wind[2]) >= 25) return 'wx-warn';
+    return null;
+  }
+
+  if (/^PROB\d{2}$/.test(token) || token === 'TEMPO' || token === 'INTER') return 'wx-warn';
+  if (/^(-|VC)?(SH)?(RA|SN|DZ|PL|SG|IC|UP)$/.test(token)) return 'wx-warn';
+  if (/^(BR|HZ|FU|DU|SA)$/.test(token)) return 'wx-warn';
+  if (/^R\d{2}[LRC]?\//.test(token)) return 'wx-warn'; // RVR group
+
+  return null;
+}

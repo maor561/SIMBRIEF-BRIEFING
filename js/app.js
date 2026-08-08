@@ -262,14 +262,16 @@ document.addEventListener('click', (event) => {
       break;
     }
 
-    case 'map-mode': {
-      const group = trigger.closest('[data-map-group]');
+    case 'pane-tab': {
+      // Generic sub-page switcher: tabs carry data-show, panes carry
+      // data-pane, and the nearest data-pane-group scopes both.
+      const group = trigger.closest('[data-pane-group]');
       if (!group) break;
-      group.querySelectorAll('[data-action="map-mode"]').forEach((tab) => {
+      group.querySelectorAll('[data-action="pane-tab"]').forEach((tab) => {
         tab.setAttribute('aria-selected', String(tab === trigger));
       });
-      group.querySelectorAll('[data-map-pane]').forEach((pane) => {
-        pane.hidden = pane.dataset.mapPane !== trigger.dataset.mode;
+      group.querySelectorAll('[data-pane]').forEach((pane) => {
+        pane.hidden = pane.dataset.pane !== trigger.dataset.show;
       });
       break;
     }

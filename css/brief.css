@@ -530,6 +530,156 @@ table.navlog-table { font-size: 11.5px; }
 table.navlog-table td { padding: 5px 8px; }
 table.navlog-table th { padding: 6px 8px; }
 
+/* -------------------------------------------------------- weather screen */
+
+/* WX / CHARTS sub-page switch, centred like the reference. */
+.pane-tabs {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  margin-block-end: -8px;
+}
+
+.pane-note {
+  text-align: center;
+  font-size: 10px;
+  color: var(--dimmer);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin-block-end: -8px;
+}
+
+/* Airport identity row: dot, role tag, name, then the three icon figures. */
+.wx-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 12px 15px;
+  background: var(--panel-2);
+  border-block-end: 1px solid var(--line-solid);
+}
+
+.wx-role {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  color: var(--dim);
+  background: var(--panel-3);
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.wx-name {
+  font-family: var(--mono);
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--blue);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.wx-head .grow { flex: 1; }
+
+.wx-stats {
+  display: flex;
+  gap: 18px;
+}
+
+.wx-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  color: var(--dimmer);
+}
+
+.wx-stat b {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.wx-stat i {
+  font-style: normal;
+  font-size: 10px;
+  color: var(--dimmer);
+}
+
+.wx-rwys {
+  padding: 7px 15px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--dim);
+  border-block-end: 1px solid var(--line-solid);
+  overflow-wrap: anywhere;
+}
+
+.wx-rwys .planned {
+  color: var(--blue);
+  font-weight: 700;
+}
+
+/* One report as issued: label + age badge, then the raw string. */
+.wxrow {
+  padding: 10px 15px;
+  border-block-end: 1px solid var(--line-solid);
+}
+
+.wxrow:last-child { border-block-end: none; }
+
+.wxrow-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-block-end: 5px;
+}
+
+.wxrow-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  color: var(--dimmer);
+}
+
+.wxrow-age {
+  font-family: var(--mono);
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: var(--panel-3);
+  color: var(--dim);
+}
+
+.wxrow-age.warn { background: var(--amber-bg); color: var(--amber); }
+.wxrow-age.bad { background: var(--red); color: #fff; }
+
+.wxrow-text {
+  font-family: var(--mono);
+  font-size: 12.5px;
+  line-height: 1.7;
+  direction: ltr;
+  unicode-bidi: isolate;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* Hazard tokens inside raw weather text and NOTAM bodies. */
+.wx-warn { color: var(--amber); font-weight: 700; }
+.wx-bad {
+  background: var(--red);
+  color: #fff;
+  font-weight: 700;
+  padding: 0 4px;
+  border-radius: 3px;
+}
+
+@media (max-width: 640px) {
+  .wx-stats { gap: 12px; width: 100%; justify-content: space-between; }
+}
+
 /* ------------------------------------------------------------ cover page */
 
 /*
