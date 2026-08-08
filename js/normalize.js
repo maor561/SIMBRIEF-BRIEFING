@@ -316,6 +316,23 @@ export function normalizeOfp(raw) {
       contingencyRule: str(general.cont_rule)
     },
 
+    // Who signed the plan out and what they said about it. SimBrief only
+    // fills the named roles when the account has them set, so any of these
+    // can legitimately be null on a real OFP.
+    crew: {
+      pilotId: str(raw.crew?.pilot_id),
+      captain: str(raw.crew?.cpt),
+      firstOfficer: str(raw.crew?.fo),
+      dispatcher: str(raw.crew?.dx),
+      purser: str(raw.crew?.pu),
+      cabin: arr(raw.crew?.fa).map((name) => str(name)).filter(Boolean)
+    },
+
+    dispatch: {
+      remark: str(general.dx_rmk),
+      systemRemark: str(general.sys_rmk)
+    },
+
     route: {
       text: str(general.route),
       ifps: str(general.route_ifps),
