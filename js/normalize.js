@@ -300,6 +300,7 @@ export function normalizeOfp(raw) {
       aircraft: str(raw.aircraft?.name) || str(raw.aircraft?.icao_code),
       aircraftIcao: str(raw.aircraft?.icao_code),
       registration: str(raw.aircraft?.reg),
+      maxPassengers: num(raw.aircraft?.max_passengers),
       engines: str(raw.aircraft?.engines),
       isEtops: flag(general.is_etops),
       costIndex: num(general.costindex),

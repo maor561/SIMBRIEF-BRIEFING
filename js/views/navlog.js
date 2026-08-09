@@ -13,14 +13,20 @@ import { stepLadder, cruiseFactsBody } from '../charts.js';
 export default function renderNavlog({ model }) {
   return `
     <div class="cover">
+      ${section(t('crz.title'), 'wind', cruiseFactsBody(model), { action: etopsFlag(model) })}
+      ${section(t('crz.stepClimb'), 'aircraft', stepLadder(model))}
       ${section(t('nav.navlog'), 'routeSwap', fixTable(model), {
         action: `<span class="sect-flag">${model.navlog.length} ${escapeHtml(t('nl.fixes'))}</span>`
       })}
-      ${section(t('crz.stepClimb'), 'aircraft', stepLadder(model))}
-      ${section(t('crz.title'), 'wind', cruiseFactsBody(model))}
       ${section(t('crz.firs'), 'airspace', firsBody(model))}
     </div>
   `;
+}
+
+function etopsFlag(model) {
+  return model.flight.isEtops
+    ? `<span class="sect-flag warn">ETOPS</span>`
+    : `<span class="sect-flag">${escapeHtml(t('crz.etopsNo'))}</span>`;
 }
 
 /**

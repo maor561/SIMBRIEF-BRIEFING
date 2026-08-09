@@ -98,27 +98,49 @@ function enrouteBlock(enroute) {
   </div>`;
 }
 
+/**
+ * A staffed position. Anything the controller broadcasts as text comes with
+ * it -- for an ATIS that is the active runway, transition level and current
+ * information letter; for a centre it is usually the sector's CPDLC logon and
+ * standing instructions. Both are things a crew would otherwise have to ask
+ * for on frequency.
+ */
 function stationRow(label, station) {
   const since = onlineFor(station.logonTime);
-  return `<div class="atc-row online">
-    <span class="atc-dot"></span>
-    <span class="atc-pos">${escapeHtml(label)}</span>
-    <span class="atc-callsign ltr">${escapeHtml(station.callsign)}</span>
-    <span class="atc-freq ltr">${escapeHtml(station.frequency || '—')}</span>
-    <span class="atc-who">
-      ${escapeHtml(station.name || '')}
-      ${since ? `<i class="ltr">${escapeHtml(since)}</i>` : ''}
-    </span>
+  const letter = atisLetter(station.atis);
+
+  return `<div class="atc-entry">
+    <div class="atc-row online">
+      <span class="atc-dot"></span>
+      <span class="atc-pos">${escapeHtml(label)}</span>
+      <span class="atc-callsign ltr">${escapeHtml(station.callsign)}</span>
+      <span class="atc-freq ltr">${escapeHtml(station.frequency || '—')}</span>
+      <span class="atc-who">
+        ${letter ? `<span class="atc-info">${escapeHtml(t('atc.info'))} ${escapeHtml(letter)}</span>` : ''}
+        ${escapeHtml(station.name || '')}
+        ${since ? `<i class="ltr">${escapeHtml(since)}</i>` : ''}
+      </span>
+    </div>
+    ${station.atis ? `<div class="atc-atis ltr">${escapeHtml(station.atis)}</div>` : ''}
   </div>`;
 }
 
+/** The information letter an ATIS names itself by: "... INFORMATION C ...". */
+function atisLetter(text) {
+  if (!text) return null;
+  const m = text.toUpperCase().match(/\bINFORMATION\s+([A-Z])\b/) || text.toUpperCase().match(/\bINFO\s+([A-Z])\b/);
+  return m ? m[1] : null;
+}
+
 function emptyRow(label, sublabel) {
-  return `<div class="atc-row">
-    <span class="atc-dot"></span>
-    <span class="atc-pos">${escapeHtml(label)}${sublabel ? ` <em>${escapeHtml(sublabel)}</em>` : ''}</span>
-    <span class="atc-callsign"></span>
-    <span class="atc-freq">—</span>
-    <span class="atc-who muted">${escapeHtml(t('atc.unstaffed'))}</span>
+  return `<div class="atc-entry">
+    <div class="atc-row">
+      <span class="atc-dot"></span>
+      <span class="atc-pos">${escapeHtml(label)}${sublabel ? ` <em>${escapeHtml(sublabel)}</em>` : ''}</span>
+      <span class="atc-callsign"></span>
+      <span class="atc-freq">—</span>
+      <span class="atc-who muted">${escapeHtml(t('atc.unstaffed'))}</span>
+    </div>
   </div>`;
 }
 

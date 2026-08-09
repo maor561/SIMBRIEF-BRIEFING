@@ -93,15 +93,18 @@ export function fmtSigned(value, unit = '') {
 
 /** SimBrief takeoff limit codes. */
 const LIMIT_CODES = {
-  F: { he: 'אורך מסלול', en: 'Field length' },
-  O: { he: 'מכשול', en: 'Obstacle' },
-  C: { he: 'שיפוע טיפוס', en: 'Climb gradient' },
-  T: { he: 'מהירות צמיגים', en: 'Tyre speed' },
-  B: { he: 'אנרגיית בלמים', en: 'Brake energy' },
-  L: { he: 'מגבלה מבנית', en: 'Structural' },
-  V: { he: 'מגבלת VMCG', en: 'VMCG' },
-  W: { he: 'מגבלת רוח', en: 'Wind' },
-  R: { he: 'מצב מסלול', en: 'Runway condition' }
+  F: { en: 'Field length' },
+  O: { en: 'Obstacle' },
+  C: { en: 'Climb gradient' },
+  T: { en: 'Tyre speed' },
+  B: { en: 'Brake energy' },
+  // Every runway SimBrief marks 'A' shares one max weight regardless of its
+  // length, so the binding limit is the airframe rather than the runway.
+  A: { en: 'Aircraft structural' },
+  L: { en: 'Structural' },
+  V: { en: 'VMCG' },
+  W: { en: 'Wind' },
+  R: { en: 'Runway condition' }
 };
 
 export function decodeLimitCode(code) {

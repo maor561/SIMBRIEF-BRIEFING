@@ -24,6 +24,7 @@ import {
   windRose,
   runwayBar,
   runwayTable,
+  airportHead,
   landingPerformanceBody
 } from '../ui.js';
 import { THRESHOLDS } from '../analyze.js';
@@ -36,36 +37,65 @@ export default function renderPerformance({ model }) {
 
   return `
     <div class="cover">
-      ${section(
-        `${t('to.perfFor')}${takeoffRunway ? ` — ${takeoffRunway.identifier}` : ''}`,
-        'aircraft',
-        takeoff ? takeoffBody(model, takeoff, takeoffRunway) : notAvailable(),
-        {
-          action: takeoffRunway?.limitCode
-            ? `<span class="sect-flag warn">${escapeHtml(t('to.limitedBy'))}: ${escapeHtml(decodeLimitCode(takeoffRunway.limitCode))}</span>`
-            : ''
-        }
-      )}
+      ${section(t('to.title'), 'aircraft', takeoffSection(model, takeoff, takeoffRunway), {
+        action: takeoffRunway?.limitCode
+          ? `<span class="sect-flag warn">${escapeHtml(t('to.limitedBy'))}: ${escapeHtml(decodeLimitCode(takeoffRunway.limitCode))}</span>`
+          : ''
+      })}
 
-      ${section(t('to.conditions'), 'wind', takeoff ? conditionsBody(takeoff, takeoffRunway) : notAvailable())}
-
-      ${section(t('to.config'), 'info', takeoff ? configBody(model, takeoff, takeoffRunway) : notAvailable())}
-
-      ${section(
-        `${t('to.otherRunways')} — ${t('nav.takeoff')}`,
-        'runway',
-        takeoff ? runwayTable(takeoff) : notAvailable()
-      )}
-
-      ${section(t('arr.landingPerf'), 'aircraft', landingPerformanceBody(model))}
-
-      ${section(
-        `${t('to.otherRunways')} — ${t('nav.arrival')}`,
-        'runway',
-        landing ? runwayTable(landing, { landing: true }) : notAvailable()
-      )}
+      ${section(t('arr.title'), 'aircraft', landingSection(model, landing))}
     </div>
   `;
+}
+
+/**
+ * Departure end: the field strip, the planned runway in full, the conditions
+ * the numbers were computed for, the configuration they assume, and every
+ * other runway in case of a late change.
+ */
+function takeoffSection(model, tlr, runway) {
+  if (!tlr) return notAvailable();
+
+  return `
+    ${airportHead(
+      model.origin,
+      'DEP',
+      tlr.runways.map((r) => r.identifier),
+      tlr.plannedRunway
+    )}
+    ${subHead(`${t('to.perfFor')} — ${runway?.identifier || ''}`)}
+    ${takeoffBody(model, tlr, runway)}
+    ${subHead(t('to.conditions'))}
+    ${conditionsBody(tlr, runway)}
+    ${subHead(t('to.config'))}
+    ${configBody(model, tlr, runway)}
+    ${subHead(`${t('to.otherRunways')} (${Math.max(0, tlr.runways.length - 1)})`)}
+    ${runwayTable(tlr)}
+  `;
+}
+
+function landingSection(model, tlr) {
+  return `
+    ${airportHead(
+      model.destination,
+      'DEST',
+      tlr?.runways?.map((r) => r.identifier),
+      tlr?.plannedRunway
+    )}
+    ${subHead(t('arr.landingPerf'))}
+    ${landingPerformanceBody(model)}
+    ${
+      tlr
+        ? `${subHead(`${t('to.otherRunways')} (${Math.max(0, tlr.runways.length - 1)})`)}
+           ${runwayTable(tlr, { landing: true })}`
+        : ''
+    }
+  `;
+}
+
+/** A labelled divider inside a section, so one panel can hold several blocks. */
+function subHead(title) {
+  return `<div class="sub-head">${escapeHtml(title)}</div>`;
 }
 
 function notAvailable() {

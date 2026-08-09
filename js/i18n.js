@@ -109,12 +109,16 @@ const STRINGS = {
   'atc.copyFailed': 'COPY FAILED',
   'atc.feedFailed': 'Could not reach VATSIM, so no station shows as staffed.',
   'atc.noFreqNote': 'Frequencies come from VATSIM and exist only while a position is staffed. The OFP carries none.',
+  'atc.info': 'INFO',
+  'atc.holding': 'holding',
   'atc.pos.atis': 'ATIS',
   'atc.pos.del': 'DELIVERY',
   'atc.pos.gnd': 'GROUND',
   'atc.pos.twr': 'TOWER',
   'atc.pos.app': 'APPROACH',
   'atc.pos.ctr': 'CENTER',
+
+  'fuel.reserveNote': 'Alternate plus final reserve must remain at landing:',
 
   'notam.title': 'NOTAMs',
   'notam.count': 'items',

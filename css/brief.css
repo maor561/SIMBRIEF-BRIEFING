@@ -680,6 +680,73 @@ table.navlog-table th { padding: 6px 8px; }
   .wx-stats { gap: 12px; width: 100%; justify-content: space-between; }
 }
 
+/* A labelled divider inside a section, when one panel holds several blocks. */
+.sub-head {
+  padding: 10px 15px;
+  background: var(--panel-2);
+  border-block: 1px solid var(--line-solid);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+
+/* --------------------------------------------------------- fuel breakdown */
+
+/* Each component drawn against the block total, so the shape of the plan --
+   mostly trip burn, with reserves as thin slivers -- reads at a glance. */
+.fuel-bars { padding: 13px 15px; }
+
+.fuel-bar {
+  display: grid;
+  grid-template-columns: minmax(120px, 1.4fr) minmax(60px, 3fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding-block: 6px;
+  font-size: 12px;
+}
+
+.fuel-bar .k { color: var(--dim); }
+
+.fuel-bar .track {
+  height: 7px;
+  border-radius: 999px;
+  background: var(--inset);
+  overflow: hidden;
+}
+
+.fuel-bar .fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--blue);
+}
+
+.fuel-bar.reserve .fill { background: var(--amber); }
+
+.fuel-bar .v {
+  font-family: var(--mono);
+  font-size: 12.5px;
+  font-weight: 600;
+  text-align: end;
+  white-space: nowrap;
+}
+
+.fuel-bar.total {
+  margin-block-start: 6px;
+  padding-block-start: 10px;
+  border-block-start: 1px solid var(--line-solid);
+  font-weight: 700;
+}
+
+.fuel-bar.total .k { color: var(--text); }
+
+@media (max-width: 640px) {
+  .fuel-bar { grid-template-columns: 1fr auto; }
+  .fuel-bar .track { display: none; }
+}
+
 /* ------------------------------------------------------------ ATC screen */
 
 .atc-group { border-block-end: 1px solid var(--line-solid); }
@@ -718,16 +785,16 @@ table.navlog-table th { padding: 6px 8px; }
 
 /* One row per position. Columns hold their width so the frequencies line up
    down the page rather than jittering with each callsign length. */
+.atc-entry { border-block-end: 1px solid var(--line-solid); }
+.atc-entry:last-child { border-block-end: none; }
+
 .atc-row {
   display: grid;
   grid-template-columns: 10px 96px 130px 84px 1fr;
   align-items: center;
   gap: 12px;
   padding: 9px 15px;
-  border-block-end: 1px solid var(--line-solid);
 }
-
-.atc-row:last-child { border-block-end: none; }
 
 .atc-dot {
   width: 8px;
@@ -786,6 +853,35 @@ table.navlog-table th { padding: 6px 8px; }
   margin-inline-start: 7px;
 }
 
+/* The broadcast text itself, inset under its station. */
+.atc-atis {
+  margin: 0 15px 11px 37px;
+  padding: 9px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--inset);
+  border: 1px solid var(--line-solid);
+  border-inline-start: 3px solid var(--blue);
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.65;
+  color: var(--dim);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.atc-info {
+  display: inline-block;
+  margin-inline-end: 8px;
+  padding: 1px 7px;
+  border-radius: 3px;
+  border: 1px solid var(--blue);
+  color: var(--blue);
+  font-family: var(--mono);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
 .atc-note {
   padding: 10px 15px;
   font-size: 11px;
@@ -824,6 +920,7 @@ table.navlog-table th { padding: 6px 8px; }
   .atc-callsign { grid-column: 2; }
   .atc-freq { grid-column: 3; grid-row: 1; }
   .atc-who { grid-column: 2 / -1; }
+  .atc-atis { margin-inline-start: 15px; }
 }
 
 /* ------------------------------------------------------------ cover page */
@@ -924,19 +1021,35 @@ table.navlog-table th { padding: 6px 8px; }
   color: var(--dim);
 }
 
+/*
+ * Sits under the arch of the curve, so it has to stay short: paired into two
+ * columns rather than one stack, which keeps four figures inside the two rows
+ * the space allows.
+ */
 .sched-facts {
   position: absolute;
   left: 50%;
-  top: 42%;
-  transform: translateX(-50%);
-  text-align: center;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  display: grid;
+  grid-template-columns: auto auto;
+  gap: 2px 22px;
   white-space: nowrap;
+  /* Knocked out of the panel so the curve passes behind the figures rather
+     than through them once the arch narrows. */
+  padding: 4px 12px;
+  background: var(--panel);
+  border-radius: var(--radius-sm);
 }
 
 .sched-facts div {
   font-size: 11.5px;
-  line-height: 1.65;
+  line-height: 1.5;
+  text-align: end;
 }
+
+.sched-facts div:nth-child(odd) { text-align: end; }
+.sched-facts div:nth-child(even) { text-align: start; }
 
 .sched-facts span {
   color: var(--dimmer);

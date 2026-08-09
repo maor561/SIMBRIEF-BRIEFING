@@ -28,6 +28,8 @@ export default function renderOverview({ model, findings }) {
   return `
     <div class="cover">
       ${section(t('ov.schedule'), 'clock', scheduleBand(model), { action: watch })}
+      ${section(t('ov.dispatch'), 'headset', dispatchBody(model))}
+      ${section(t('common.route'), 'routeSwap', routeBody(model))}
       ${
         findings.length
           ? section(t('sum.watchItems'), 'obstacle', findingsList(findings, { showChapter: true }), {
@@ -35,8 +37,6 @@ export default function renderOverview({ model, findings }) {
             })
           : ''
       }
-      ${section(t('ov.dispatch'), 'headset', dispatchBody(model))}
-      ${section(t('common.route'), 'routeSwap', routeBody(model))}
     </div>
   `;
 }
@@ -135,12 +135,24 @@ function scheduleBand(model) {
         ${fact(t('sum.blockFuel'), `${fmtNumber(model.fuel.planRamp)} ${units}`)}
         ${fact(t('ov.groundDistance'), `${fmtNumber(model.route.distance)} nm`)}
         ${fact(t('dep.cruiseAlt'), cruiseAlt ? `FL${Math.round(cruiseAlt / 100)}` : '—')}
+        ${fact(t('dep.pax'), paxFigure(model))}
       </div>
       ${dots}
     </div>
 
     <div class="sched-marks">${labels}</div>
   </div>`;
+}
+
+/**
+ * Passengers, against the type's seating when SimBrief gives it -- "184 / 184"
+ * says a full aircraft in a way a bare count does not.
+ */
+function paxFigure(model) {
+  const pax = model.weights.paxCount;
+  if (!Number.isFinite(pax)) return '—';
+  const seats = model.flight.maxPassengers;
+  return Number.isFinite(seats) && seats > 0 ? `${fmtNumber(pax)} / ${fmtNumber(seats)}` : fmtNumber(pax);
 }
 
 function port(airport, side) {
