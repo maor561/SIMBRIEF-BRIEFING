@@ -1,20 +1,27 @@
 /**
  * Navlog.
  *
- * The route flown as a table of fixes, plus the vertical plan around it:
- * step climbs, the airspace crossed, and whether the flight is ETOPS.
+ * The route flown as a table of fixes, the vertical plan around it, and a
+ * fuel check the crew fills in as the flight goes: what the OFP predicted at
+ * each point against what the gauges actually read.
  */
 
 import { t } from '../i18n.js';
-import { escapeHtml, fmtNumber, fmtFeet, fmtWeight, fmtDuration } from '../decode.js';
-import { section, chip, kv, tiles } from '../ui.js';
+import { escapeHtml, fmtNumber, fmtWeight, fmtDuration } from '../decode.js';
+import { section, chip, icon } from '../ui.js';
 import { stepLadder, cruiseFactsBody } from '../charts.js';
+import { getActuals, summarise, classify } from '../fuellog.js';
 
 export default function renderNavlog({ model }) {
+  const actuals = getActuals(model);
+
   return `
     <div class="cover">
       ${section(t('crz.title'), 'wind', cruiseFactsBody(model), { action: etopsFlag(model) })}
       ${section(t('crz.stepClimb'), 'aircraft', stepLadder(model))}
+      ${section(t('nl.fuelCheck'), 'clock', fuelCheckBody(model, actuals), {
+        action: `<span data-fuel-flag>${summaryFlag(model, actuals)}</span>`
+      })}
       ${section(t('nav.navlog'), 'routeSwap', fixTable(model), {
         action: `<span class="sect-flag">${model.navlog.length} ${escapeHtml(t('nl.fixes'))}</span>`
       })}
@@ -29,6 +36,108 @@ function etopsFlag(model) {
     : `<span class="sect-flag">${escapeHtml(t('crz.etopsNo'))}</span>`;
 }
 
+/* ----------------------------------------------------------- fuel check */
+
+const STATE_TONE = {
+  onPlan: 'good',
+  under: 'warn',
+  overBurn: 'bad',
+  belowMin: 'bad',
+  none: ''
+};
+
+/** The section-header verdict: worst reading logged so far. */
+export function summaryFlag(model, actuals) {
+  const s = summarise(model, actuals);
+  if (!s.count) return `<span class="sect-flag">${escapeHtml(t('nl.noReadings'))}</span>`;
+
+  const tone = STATE_TONE[s.state] || '';
+  return `<span class="sect-flag ${tone}">${escapeHtml(t(`nl.state.${s.state}`))} · <span class="ltr">${signedWeight(
+    s.worst.diff,
+    model.units
+  )}</span></span>`;
+}
+
+/** Typographic minus, matching the diff cells rather than a stray hyphen. */
+function signedWeight(value, units) {
+  if (!Number.isFinite(value)) return '—';
+  const sign = value > 0 ? '+' : value < 0 ? '−' : '';
+  return `${sign}${fmtWeight(Math.abs(value), units)}`;
+}
+
+function fuelCheckBody(model, actuals) {
+  const fixes = model.navlog.filter((f) => Number.isFinite(f.fuelOnBoard));
+  if (!fixes.length) return `<div class="empty-state">${escapeHtml(t('common.notAvailable'))}</div>`;
+
+  const unit = model.units === 'lbs' ? 'lb' : 'kg';
+
+  return `
+    <div class="atc-note">
+      ${icon('info', { size: 13 })}
+      ${escapeHtml(t('nl.fuelCheckNote'))} ${fmtWeight(model.fuel.contingency, model.units)}
+    </div>
+
+    <div data-fuel-summary>${summaryPanel(model, actuals)}</div>
+
+    <div class="table-scroll"><table class="rw-table fuelcheck-table">
+      <thead><tr>
+        <th>${escapeHtml(t('nl.ident'))}</th>
+        <th>${escapeHtml(t('common.time'))}</th>
+        <th>${escapeHtml(t('nl.planned'))} (${unit})</th>
+        <th>${escapeHtml(t('nl.minimum'))} (${unit})</th>
+        <th>${escapeHtml(t('nl.actual'))} (${unit})</th>
+        <th>${escapeHtml(t('nl.diff'))}</th>
+      </tr></thead>
+      <tbody>${fixes.map((fix) => fuelRow(model, fix, actuals)).join('')}</tbody>
+    </table></div>
+  `;
+}
+
+function fuelRow(model, fix, actuals) {
+  const actual = actuals[fix.index];
+  const { state, diff } = classify(fix, actual, model.fuel.contingency);
+
+  return `<tr>
+    <td><b>${escapeHtml(fix.ident)}</b></td>
+    <td>${Number.isFinite(fix.timeTotal) ? fmtDuration(fix.timeTotal) : '—'}</td>
+    <td>${fmtNumber(fix.fuelOnBoard)}</td>
+    <td class="dim">${Number.isFinite(fix.fuelMinOnBoard) ? fmtNumber(fix.fuelMinOnBoard) : '—'}</td>
+    <td>
+      <input class="fuel-input" type="number" inputmode="numeric" step="10"
+             data-action="actual-fuel" data-fix-index="${fix.index}"
+             value="${Number.isFinite(actual) ? actual : ''}"
+             aria-label="${escapeHtml(`${t('nl.actual')} ${fix.ident}`)}">
+    </td>
+    <td data-fuel-diff="${fix.index}">${diffCell(state, diff)}</td>
+  </tr>`;
+}
+
+/** Exported so a keystroke can repaint one cell without rebuilding the page. */
+export function diffCell(state, diff) {
+  if (state === 'none' || diff === null) return '<span class="fuel-diff">—</span>';
+  const tone = STATE_TONE[state] || '';
+  const sign = diff > 0 ? '+' : diff < 0 ? '−' : '';
+  return `<span class="fuel-diff ${tone}" title="${escapeHtml(state)}">${sign}${fmtNumber(Math.abs(diff))}</span>`;
+}
+
+/** Exported for the same reason: repaint on input, not a full re-render. */
+export function summaryPanel(model, actuals) {
+  const s = summarise(model, actuals);
+  if (!s.count) return '';
+
+  const cell = (label, value, tone = '') =>
+    `<div><span class="k">${escapeHtml(label)}</span><span class="v ltr ${tone}">${value}</span></div>`;
+
+  return `<div class="fuel-summary">
+    ${cell(t('nl.logged'), `${s.count} / ${model.navlog.length}`)}
+    ${cell(t('nl.latest'), `${escapeHtml(s.latest.fix.ident)} ${signedWeight(s.latest.diff, model.units)}`, STATE_TONE[s.latest.state])}
+    ${cell(t('nl.worst'), `${escapeHtml(s.worst.fix.ident)} ${signedWeight(s.worst.diff, model.units)}`, STATE_TONE[s.worst.state])}
+    ${cell(t('dep.contingency'), fmtWeight(s.contingency, model.units))}
+  </div>`;
+}
+
+/* --------------------------------------------------------------- navlog */
+
 /**
  * Every fix with the figures the OFP carries for it. Dense on purpose --
  * this is the reference table a crew scans in flight, not a summary.
@@ -36,8 +145,6 @@ function etopsFlag(model) {
 function fixTable(model) {
   const fixes = model.navlog;
   if (!fixes.length) return `<div class="empty-state">${escapeHtml(t('common.notAvailable'))}</div>`;
-
-  const units = model.units;
 
   const headers = [
     t('nl.ident'),
@@ -92,6 +199,6 @@ function firsBody(model) {
 
   return `<div class="sect-pad">
     <div style="display:flex;gap:7px;flex-wrap:wrap">${firs.map((fir) => chip(fir, 'blue')).join('')}</div>
-    ${model.route.section18 ? `<div class="raw-wx" style="margin-block-start:12px">${escapeHtml(model.route.section18)}</div>` : ''}
+    ${model.route.section18 ? `<div class="wxrow-text" style="margin-block-start:12px">${escapeHtml(model.route.section18)}</div>` : ''}
   </div>`;
 }

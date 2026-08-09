@@ -8,7 +8,7 @@
 
 import { t } from '../i18n.js';
 import { escapeHtml, fmtNumber, fmtWeight, fmtDuration } from '../decode.js';
-import { section, tiles, meter, icon } from '../ui.js';
+import { section, meter, icon } from '../ui.js';
 import { fuelCurve, impactsTable } from '../charts.js';
 
 export default function renderFuel({ model }) {
@@ -59,17 +59,17 @@ function fuelPlanBody(model) {
   const total = f.planRamp || 0;
 
   return `
-    ${tiles([
-      { label: t('dep.blockFuel'), value: fmtNumber(f.planRamp), unit: unitLabel, size: 'big', tone: 'info' },
-      { label: t('dep.endurance'), value: fmtDuration(model.times.endurance) },
-      { label: t('des.atLanding'), value: fmtNumber(f.planLanding), unit: unitLabel },
-      {
-        label: t('des.holdingTime'),
-        value: minutes === null ? '—' : String(minutes),
-        unit: t('common.min'),
-        tone: minutes === null ? '' : minutes < 15 ? 'warn' : 'good'
-      }
-    ])}
+    <div class="figs">
+      ${fig(t('dep.blockFuel'), fmtNumber(f.planRamp), unitLabel)}
+      ${fig(t('dep.endurance'), fmtDuration(model.times.endurance))}
+      ${fig(t('des.atLanding'), fmtNumber(f.planLanding), unitLabel)}
+      ${fig(
+        t('des.holdingTime'),
+        minutes === null ? '—' : String(minutes),
+        t('common.min'),
+        minutes === null ? '' : minutes < 15 ? 'warn' : 'good'
+      )}
+    </div>
 
     <div class="fuel-bars">
       ${parts
@@ -126,12 +126,12 @@ function weightsBody(model) {
   const unitLabel = units === 'lbs' ? 'lb' : 'kg';
 
   return `
-    ${tiles([
-      { label: t('dep.pax'), value: fmtNumber(w.paxCount), size: 'big' },
-      { label: t('dep.bags'), value: fmtNumber(w.bagCount) },
-      { label: t('dep.cargo'), value: w.cargo === null ? '—' : fmtNumber(w.cargo), unit: unitLabel },
-      { label: t('dep.payload'), value: w.payload === null ? '—' : fmtNumber(w.payload), unit: unitLabel }
-    ])}
+    <div class="figs">
+      ${fig(t('dep.pax'), fmtNumber(w.paxCount))}
+      ${fig(t('dep.bags'), fmtNumber(w.bagCount))}
+      ${fig(t('dep.cargo'), w.cargo === null ? '—' : fmtNumber(w.cargo), unitLabel)}
+      ${fig(t('dep.payload'), w.payload === null ? '—' : fmtNumber(w.payload), unitLabel)}
+    </div>
     <div class="sect-pad">
       ${meter({ label: t('dep.zfw'), value: w.estZfw, max: w.maxZfw, units })}
       ${meter({ label: t('dep.tow'), value: w.estTow, max: w.maxTow, units })}
@@ -142,6 +142,14 @@ function weightsBody(model) {
       ${field(t('dep.ramp'), fmtWeight(w.estRamp, units))}
     </div>
   `;
+}
+
+/** One headline figure, in the row shared with the performance screens. */
+function fig(label, value, unit = '', tone = '') {
+  return `<div class="fig">
+    <span class="k">${escapeHtml(label)}</span>
+    <span class="v ltr ${tone}">${value}${unit ? `<i> ${escapeHtml(unit)}</i>` : ''}</span>
+  </div>`;
 }
 
 function field(label, value) {

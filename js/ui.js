@@ -116,24 +116,6 @@ export function flushCard(opts) {
   return card({ ...opts, cls: `flush ${opts.cls || ''}` });
 }
 
-/* ------------------------------------------------------------------- tiles */
-
-/**
- * A single figure. `tone` drives colour: good / warn / bad / info.
- * `size` accepts 'big' or 'huge' for the numbers that deserve the room.
- */
-export function tile({ label, value, unit, hint, tone = '', size = '', icon: iconName = '' }) {
-  return `<div class="tile ${tone} ${size}">
-    <div class="label">${iconName ? icon(iconName, { size: 12 }) : ''}${escapeHtml(label)}</div>
-    <div class="value">${value ?? '—'}${unit ? `<span class="unit">${escapeHtml(unit)}</span>` : ''}</div>
-    ${hint ? `<div class="hint">${hint}</div>` : ''}
-  </div>`;
-}
-
-export function tiles(items) {
-  return `<div class="tiles">${items.filter(Boolean).map(tile).join('')}</div>`;
-}
-
 export function chip(text, tone = '') {
   return `<span class="chip ${tone}">${escapeHtml(text)}</span>`;
 }
@@ -576,44 +558,64 @@ export function landingPerformanceBody(model) {
   const maxWeight = runway.maxWeightDry ?? model.weights.maxLdw;
   const isTailwind = Number.isFinite(runway.headwind) && runway.headwind < 0;
 
+  const crosswindTone = !Number.isFinite(runway.crosswind)
+    ? ''
+    : runway.crosswind >= 25
+    ? 'bad'
+    : runway.crosswind >= 15
+    ? 'warn'
+    : 'good';
+
+  const field = (label, value) =>
+    `<div class="sect-field">
+      <span class="k">${escapeHtml(label)}</span>
+      <span class="v ltr">${value}</span>
+    </div>`;
+
   return `
-    ${tiles([
-      { label: t('common.runway'), value: escapeHtml(runway.identifier), size: 'huge', tone: 'info' },
-      { label: t('arr.lda'), value: fmtNumber(runway.lda), unit: 'ft', size: 'big' },
-      { label: t('to.flap'), value: tlr.flap || runway.flap || '—', size: 'big' },
-      { label: 'ILS', value: runway.ils || '—' }
-    ])}
-
-    <div style="padding:13px">
-      ${runwayBar(runway, { showStop: false })}
+    <div class="figs">
+      <div class="fig">
+        <span class="k">${escapeHtml(t('common.runway'))}</span>
+        <span class="v ltr">${escapeHtml(runway.identifier)}</span>
+      </div>
+      <div class="fig">
+        <span class="k">${escapeHtml(t('arr.lda'))}</span>
+        <span class="v ltr">${fmtNumber(runway.lda)}<i> ft</i></span>
+      </div>
+      <div class="fig">
+        <span class="k">${escapeHtml(t('to.flap'))}</span>
+        <span class="v ltr">${escapeHtml(String(tlr.flap || runway.flap || '—'))}</span>
+      </div>
+      <div class="fig">
+        <span class="k">ILS</span>
+        <span class="v ltr">${escapeHtml(runway.ils || '—')}</span>
+      </div>
     </div>
 
-    <div style="padding:0 13px">
-      ${tiles([
-        {
-          label: isTailwind ? t('to.tailwind') : t('to.headwind'),
-          value: Number.isFinite(runway.headwind) ? String(Math.abs(runway.headwind)) : '—',
-          unit: 'kt',
-          tone: isTailwind ? 'bad' : 'good'
-        },
-        {
-          label: t('to.crosswind'),
-          value: Number.isFinite(runway.crosswind) ? String(runway.crosswind) : '—',
-          unit: 'kt',
-          tone: !Number.isFinite(runway.crosswind) ? '' : runway.crosswind >= 25 ? 'bad' : runway.crosswind >= 15 ? 'warn' : 'good'
-        },
-        { label: t('arr.gradient'), value: runway.gradient === null ? '—' : `${runway.gradient}%` },
-        { label: t('common.temp'), value: tlr.temperature === null ? '—' : `${tlr.temperature}°C` }
-      ])}
+    <div class="sect-pad">${runwayBar(runway, { showStop: false })}</div>
+
+    <div class="sect-fields">
+      ${field(
+        isTailwind ? t('to.tailwind') : t('to.headwind'),
+        Number.isFinite(runway.headwind)
+          ? `<span class="${isTailwind ? 'bad' : 'good'}">${Math.abs(runway.headwind)} kt</span>`
+          : '—'
+      )}
+      ${field(
+        t('to.crosswind'),
+        Number.isFinite(runway.crosswind)
+          ? `<span class="${crosswindTone}">${runway.crosswind} kt</span>`
+          : '—'
+      )}
+      ${field(t('arr.gradient'), runway.gradient === null ? '—' : `${runway.gradient}%`)}
+      ${field(t('common.temp'), tlr.temperature === null ? '—' : `${tlr.temperature}°C`)}
+      ${field(t('arr.maxDry'), runway.maxWeightDry ? fmtWeight(runway.maxWeightDry, model.units) : '—')}
+      ${field(t('arr.maxWet'), runway.maxWeightWet ? fmtWeight(runway.maxWeightWet, model.units) : '—')}
+      ${field(t('to.surface'), decodeSurface(tlr.surface) || '—')}
     </div>
 
-    <div style="padding:13px">
+    <div class="sect-pad">
       ${meter({ label: t('arr.ldw'), value: tlr.plannedWeight ?? model.weights.estLdw, max: maxWeight, units: model.units })}
-      ${kv([
-        [t('arr.maxDry'), runway.maxWeightDry ? fmtWeight(runway.maxWeightDry, model.units) : '—'],
-        [t('arr.maxWet'), runway.maxWeightWet ? fmtWeight(runway.maxWeightWet, model.units) : '—'],
-        [t('to.surface'), tlr.surface || '—']
-      ])}
     </div>
   `;
 }

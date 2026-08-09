@@ -15,9 +15,10 @@ import renderWeather from './views/weather.js';
 import renderNotams from './views/notams.js';
 import renderFuel from './views/fuel.js';
 import renderPerformance from './views/performance.js';
-import renderNavlog from './views/navlog.js';
+import renderNavlog, { diffCell, summaryPanel, summaryFlag } from './views/navlog.js';
 import renderAtc from './views/atc.js';
 import { buildFixDetail } from './charts.js';
+import { setActual, classify } from './fuellog.js';
 
 const STORAGE_USER = 'sbb.username';
 
@@ -354,6 +355,32 @@ document.addEventListener('click', (event) => {
     default:
       break;
   }
+});
+
+/**
+ * Fuel readings repaint in place rather than through renderChapter: a full
+ * re-render would replace the input the crew is typing into and drop focus
+ * mid-figure.
+ */
+document.addEventListener('input', (event) => {
+  const input = event.target.closest('[data-action="actual-fuel"]');
+  if (!input) return;
+
+  const index = Number(input.dataset.fixIndex);
+  const actuals = setActual(state.model, index, input.value);
+  const fix = state.model.navlog.find((f) => f.index === index);
+
+  const cell = document.querySelector(`[data-fuel-diff="${index}"]`);
+  if (cell && fix) {
+    const { state: verdict, diff } = classify(fix, actuals[index], state.model.fuel.contingency);
+    cell.innerHTML = diffCell(verdict, diff);
+  }
+
+  const summary = document.querySelector('[data-fuel-summary]');
+  if (summary) summary.innerHTML = summaryPanel(state.model, actuals);
+
+  const flag = document.querySelector('[data-fuel-flag]');
+  if (flag) flag.innerHTML = summaryFlag(state.model, actuals);
 });
 
 document.addEventListener('change', (event) => {

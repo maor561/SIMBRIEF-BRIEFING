@@ -9,7 +9,6 @@
 import { t } from '../i18n.js';
 import {
   escapeHtml,
-  fmtNumber,
   fmtFeet,
   fmtWeight,
   decodeLimitCode,
@@ -17,9 +16,6 @@ import {
 } from '../decode.js';
 import {
   section,
-  tiles,
-  kv,
-  chip,
   meter,
   windRose,
   runwayBar,
@@ -102,56 +98,63 @@ function notAvailable() {
   return `<div class="empty-state">${escapeHtml(t('common.notAvailable'))}</div>`;
 }
 
-/* The headline card: speeds, then the runway drawn to scale. */
+/* Speeds first, then the runway drawn to scale, then the geometry. */
 function takeoffBody(model, tlr, runway) {
   if (!runway) return notAvailable();
 
-  const units = model.units;
   const hasSpeeds = runway.v1 || runway.vr || runway.v2;
 
   return `
-    ${tiles([
-      { label: 'V1', value: runway.v1 ?? '—', size: 'huge' },
-      { label: 'VR', value: runway.vr ?? '—', size: 'huge' },
-      { label: 'V2', value: runway.v2 ?? '—', size: 'huge' },
-      runway.vref ? { label: runway.vrefId || 'VREF', value: runway.vref, size: 'big', tone: 'info' } : null
+    <div class="figs">
+      ${speed('V1', runway.v1)}
+      ${speed('VR', runway.vr)}
+      ${speed('V2', runway.v2)}
+      ${runway.vref ? speed(runway.vrefId || 'VREF', runway.vref) : ''}
+    </div>
+    ${
+      hasSpeeds
+        ? ''
+        : `<div class="atc-note">${escapeHtml(t('common.notAvailable'))} — V-speeds</div>`
+    }
+
+    <div class="sect-pad">${runwayBar(runway)}</div>
+
+    ${fields([
+      [t('to.decide'), runway.distanceDecide ? fmtFeet(runway.distanceDecide) : '—'],
+      [t('to.reject'), runway.distanceReject ? fmtFeet(runway.distanceReject) : '—'],
+      [t('to.stopMargin'), marginValue(runway.distanceMargin)],
+      [t('to.continue'), runway.distanceContinue ? fmtFeet(runway.distanceContinue) : '—'],
+      ['TORA', runway.tora ? fmtFeet(runway.tora) : '—'],
+      ['TODA', runway.toda ? fmtFeet(runway.toda) : '—'],
+      ['ASDA', runway.asda ? fmtFeet(runway.asda) : '—'],
+      [t('arr.gradient'), runway.gradient === null ? '—' : `${runway.gradient}%`],
+      ['ILS', runway.ils || '—']
     ])}
-    ${hasSpeeds ? '' : `<div class="img-note" style="padding:9px 15px 0">${escapeHtml(t('common.notAvailable'))} — V-speeds</div>`}
 
     <div class="sect-pad">
-      ${runwayBar(runway)}
-      ${kv([
-        [t('to.decide'), runway.distanceDecide ? fmtFeet(runway.distanceDecide) : '—'],
-        [t('to.reject'), runway.distanceReject ? fmtFeet(runway.distanceReject) : '—'],
-        [t('to.stopMargin'), marginCell(runway.distanceMargin)],
-        [t('to.continue'), runway.distanceContinue ? fmtFeet(runway.distanceContinue) : '—']
-      ])}
-    </div>
-
-    <div class="sect-pad" style="padding-block-start:0">
       ${meter({
         label: t('to.weightLimit'),
         value: tlr.plannedWeight,
         max: runway.maxWeight,
-        units,
+        units: model.units,
         warnBelow: 500,
         badBelow: 0
       })}
-      ${kv([
-        ['TORA', runway.tora ? fmtFeet(runway.tora) : '—'],
-        ['TODA', runway.toda ? fmtFeet(runway.toda) : '—'],
-        ['ASDA', runway.asda ? fmtFeet(runway.asda) : '—'],
-        [t('arr.gradient'), runway.gradient === null ? '—' : `${runway.gradient}%`],
-        ['ILS', runway.ils || '—']
-      ])}
     </div>
   `;
 }
 
-function marginCell(margin) {
+function speed(label, value) {
+  return `<div class="fig">
+    <span class="k">${escapeHtml(label)}</span>
+    <span class="v ltr">${value ?? '—'}</span>
+  </div>`;
+}
+
+function marginValue(margin) {
   if (!Number.isFinite(margin)) return '—';
-  const tone = margin < 100 ? 'var(--red)' : margin < THRESHOLDS.stopMarginFt ? 'var(--amber)' : 'var(--green)';
-  return `<span style="color:${tone}">${fmtFeet(margin)}</span>`;
+  const tone = margin < 100 ? 'bad' : margin < THRESHOLDS.stopMarginFt ? 'warn' : 'good';
+  return `<span class="${tone}">${fmtFeet(margin)}</span>`;
 }
 
 /* Wind first: the component figures are what decides technique. */
@@ -169,46 +172,37 @@ function conditionsBody(tlr, runway) {
     : 'good';
 
   return `
-    <div class="sect-pad">
-      <div style="display:flex;gap:14px;align-items:center;margin-block-end:12px">
-        ${windRose(tlr.windDir, tlr.windSpd, runway?.magneticCourse)}
+    <div class="perf-wind">
+      ${windRose(tlr.windDir, tlr.windSpd, runway?.magneticCourse)}
+      <div class="perf-wind-figs">
         <div>
-          <div class="num" style="font-size:20px;font-weight:700">${tlr.windDir ?? '—'}° / ${tlr.windSpd ?? '—'} kt</div>
-          <div style="font-size:11.5px;color:var(--dimmer)">${escapeHtml(t('common.wind'))}</div>
+          <span class="k">${escapeHtml(t('common.wind'))}</span>
+          <span class="v ltr">${tlr.windDir ?? '—'}° / ${tlr.windSpd ?? '—'} kt</span>
+        </div>
+        <div>
+          <span class="k">${escapeHtml(isTailwind ? t('to.tailwind') : t('to.headwind'))}</span>
+          <span class="v ltr ${isTailwind ? 'bad' : 'good'}">${
+            Number.isFinite(headwind) ? `${Math.abs(headwind)} kt` : '—'
+          }</span>
+        </div>
+        <div>
+          <span class="k">${escapeHtml(t('to.crosswind'))}</span>
+          <span class="v ltr ${crosswindTone}">${Number.isFinite(crosswind) ? `${crosswind} kt` : '—'}</span>
         </div>
       </div>
     </div>
 
-    ${tiles([
-      {
-        label: isTailwind ? t('to.tailwind') : t('to.headwind'),
-        value: Number.isFinite(headwind) ? String(Math.abs(headwind)) : '—',
-        unit: 'kt',
-        size: 'big',
-        tone: isTailwind ? 'bad' : 'good'
-      },
-      {
-        label: t('to.crosswind'),
-        value: Number.isFinite(crosswind) ? String(crosswind) : '—',
-        unit: 'kt',
-        size: 'big',
-        tone: crosswindTone
-      }
+    ${fields([
+      [t('common.temp'), tlr.temperature === null ? '—' : `${tlr.temperature}°C`],
+      [t('common.qnh'), tlr.altimeter === null ? '—' : `${tlr.altimeter} inHg`],
+      [t('to.surface'), decodeSurface(tlr.surface) || '—'],
+      [t('common.planned'), fmtWeight(tlr.plannedWeight, 'kgs')]
     ])}
-
-    <div class="sect-pad">
-      ${kv([
-        [t('common.temp'), tlr.temperature === null ? '—' : `${tlr.temperature}°C`],
-        [t('common.qnh'), tlr.altimeter === null ? '—' : `${tlr.altimeter} inHg`],
-        [t('to.surface'), decodeSurface(tlr.surface) || '—'],
-        [t('common.planned'), fmtWeight(tlr.plannedWeight, 'kgs')]
-      ])}
-    </div>
   `;
 }
 
 function configBody(model, tlr, runway) {
-  return `<div class="sect-pad">${kv([
+  return fields([
     [t('to.flap'), runway?.flap || tlr.flap || '—'],
     [t('to.thrust'), runway?.thrust || '—'],
     [t('to.bleeds'), runway?.bleed || '—'],
@@ -217,5 +211,17 @@ function configBody(model, tlr, runway) {
     [t('to.climbProfile'), model.flight.climbProfile || '—'],
     [t('to.initialAlt'), model.flight.initialAltitude ? fmtFeet(model.flight.initialAltitude) : '—'],
     [t('common.transAlt'), model.origin?.transAlt ? fmtFeet(model.origin.transAlt) : '—']
-  ])}</div>`;
+  ]);
+}
+
+/** The label/value grid the rest of the briefing uses. */
+function fields(pairs) {
+  return `<div class="sect-fields">${pairs
+    .map(
+      ([label, value]) => `<div class="sect-field">
+        <span class="k">${escapeHtml(label)}</span>
+        <span class="v ltr">${value}</span>
+      </div>`
+    )
+    .join('')}</div>`;
 }

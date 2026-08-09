@@ -19,7 +19,7 @@ import {
   notamActiveDuring,
   notamIconName
 } from './decode.js';
-import { flushCard, tiles, kv, chip, icon } from './ui.js';
+import { flushCard, chip, icon } from './ui.js';
 import { THRESHOLDS } from './analyze.js';
 
 /**
@@ -488,23 +488,31 @@ export function impactsTable(model) {
 
 export function cruiseFactsBody(model) {
   const f = model.flight;
-  const avgComponent = f.avgWindComponent;
+  const avg = f.avgWindComponent;
 
-  return `
-    ${tiles([
-      { label: t('to.initialAlt'), value: f.initialAltitude ? `FL${Math.round(f.initialAltitude / 100)}` : '—', size: 'big', tone: 'info' },
-      { label: t('crz.avgWind'), value: Number.isFinite(avgComponent) ? `${avgComponent >= 0 ? '+' : '−'}${Math.abs(avgComponent)}` : '—', unit: 'kt', tone: (avgComponent ?? 0) >= 0 ? 'good' : 'bad' },
-      { label: 'MACH', value: f.cruiseMach || '—' },
-      { label: 'CI', value: f.costIndex ?? '—' }
-    ])}
-    <div style="padding-block-start:11px">
-      ${kv([
-        [t('crz.tropopause'), f.avgTropopause ? fmtFeet(f.avgTropopause) : '—'],
-        [t('crz.layer.isa'), f.avgTempDev === null ? '—' : `${f.avgTempDev > 0 ? '+' : ''}${f.avgTempDev}°C`],
-        ['TAS', f.cruiseTas ? `${f.cruiseTas} kt` : '—'],
-        [t('crz.etops'), f.isEtops ? chip('ETOPS', 'amber') : t('crz.etopsNo')]
-      ])}
-    </div>
-  `;
+  const pairs = [
+    [t('to.initialAlt'), f.initialAltitude ? `FL${Math.round(f.initialAltitude / 100)}` : '—'],
+    ['MACH', f.cruiseMach || '—'],
+    ['TAS', f.cruiseTas ? `${f.cruiseTas} kt` : '—'],
+    ['CI', f.costIndex ?? '—'],
+    [
+      t('crz.avgWind'),
+      Number.isFinite(avg)
+        ? `<span class="${avg >= 0 ? 'good' : 'bad'}">${avg >= 0 ? '+' : '−'}${Math.abs(avg)} kt</span>`
+        : '—'
+    ],
+    [t('crz.tropopause'), f.avgTropopause ? fmtFeet(f.avgTropopause) : '—'],
+    [t('crz.layer.isa'), f.avgTempDev === null ? '—' : `${f.avgTempDev > 0 ? '+' : ''}${f.avgTempDev}°C`],
+    [t('crz.profile'), f.cruiseProfile || '—']
+  ];
+
+  return `<div class="sect-fields">${pairs
+    .map(
+      ([label, value]) => `<div class="sect-field">
+        <span class="k">${escapeHtml(label)}</span>
+        <span class="v ltr">${value}</span>
+      </div>`
+    )
+    .join('')}</div>`;
 }
 
