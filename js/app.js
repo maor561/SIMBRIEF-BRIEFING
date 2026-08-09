@@ -53,7 +53,6 @@ const state = {
 const el = {
   app: document.getElementById('app'),
   overlay: document.getElementById('overlay'),
-  header: document.getElementById('header'),
   rail: document.getElementById('rail'),
   content: document.getElementById('content'),
   form: document.getElementById('setup-form'),
@@ -135,33 +134,8 @@ function showError(message) {
 /* ------------------------------------------------------------------ render */
 
 function render() {
-  renderHeader();
   renderRail();
   renderChapter();
-}
-
-function renderHeader() {
-  const m = state.model;
-  const etd = m.times.estOff || m.times.schedOff;
-  const block = m.times.estBlock ?? m.times.schedBlock;
-  const altn = m.alternates[0];
-
-  el.header.innerHTML = `
-    <span class="callsign">${escapeHtml(m.flight.callsign || '')}</span>
-    <span class="pair">${escapeHtml(m.origin?.icao || '')}<span class="arrow">→</span>${escapeHtml(m.destination?.icao || '')}</span>
-    <div class="facts">
-      <span class="fact"><b>${escapeHtml(m.flight.aircraftIcao || '')}</b><span>${escapeHtml(m.flight.registration || 'TYPE')}</span></span>
-      <span class="fact"><b>${escapeHtml(fmtZulu(etd))}</b><span>${escapeHtml(t('header.etd'))}</span></span>
-      <span class="fact"><b>${escapeHtml(fmtDuration(block))}</b><span>${escapeHtml(t('header.block'))}</span></span>
-      ${altn ? `<span class="fact"><b>${escapeHtml(altn.icao)}</b><span>${escapeHtml(t('header.altn'))}</span></span>` : ''}
-    </div>
-    <span class="spacer"></span>
-    ${state.demo ? `<span class="demo-flag">${escapeHtml(t('header.demo'))}</span>` : ''}
-    <div class="tools">
-      <span class="clock" id="clock">${escapeHtml(fmtZulu(new Date()))}</span>
-      <button class="tool-btn" data-action="refresh" title="${escapeHtml(t('header.refresh'))}">↻</button>
-    </div>
-  `;
 }
 
 function renderRail() {
@@ -172,7 +146,7 @@ function renderRail() {
   // rather than a per-chapter count.
   const whole = { total, critical: state.findings.filter((f) => f.severity === SEVERITY.CRITICAL).length };
 
-  el.rail.innerHTML = CHAPTERS.map((chapter) => {
+  const items = CHAPTERS.map((chapter) => {
     const count = chapter.id === 'overview' ? whole : counts[chapter.id];
     const badge = count?.total
       ? `<span class="rail-badge ${count.critical ? 'critical' : ''}">${count.total}</span>`
@@ -181,9 +155,23 @@ function renderRail() {
       ${badge}
       <svg class="glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="${chapter.icon}"/></svg>
       <span class="label">${escapeHtml(t(`nav.${chapter.id}`))}</span>
-      <span class="step">${escapeHtml(chapter.step)}</span>
     </button>`;
   }).join('');
+
+  // Refresh and the Zulu clock are app-level, not part of any one chapter, so
+  // they sit at the foot of the rail rather than in a bar of their own. The
+  // demo marker stays with them: it has to remain visible on every screen so
+  // sample data is never mistaken for a real briefing.
+  el.rail.innerHTML = `
+    <div class="rail-items">${items}</div>
+    <div class="rail-foot">
+      ${state.demo ? `<span class="demo-flag">${escapeHtml(t('header.demo'))}</span>` : ''}
+      <span class="clock" id="clock">${escapeHtml(fmtZulu(new Date()))}</span>
+      <button class="rail-btn" data-action="refresh" title="${escapeHtml(t('header.refresh'))}" aria-label="${escapeHtml(t('header.refresh'))}">
+        <svg class="glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.4-5.7M20 4v4h-4"/></svg>
+      </button>
+    </div>
+  `;
 }
 
 function renderChapter({ preserveScroll = false } = {}) {

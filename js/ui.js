@@ -626,6 +626,13 @@ export function landingPerformanceBody(model) {
  * Scaled runway strip for takeoff: available length, accelerate-stop distance,
  * the decision point and the remaining margin. Reading "how much room is left"
  * off a picture is faster than comparing four numbers.
+ *
+ * Built from elements rather than SVG. The previous version stretched a fixed
+ * viewBox to the panel width, which distorted every label horizontally and --
+ * because the reject and margin figures were both centred on their own
+ * segments -- ran them into each other whenever the margin was short. Here the
+ * bar scales but the text does not, and the two figures sit in a flex row that
+ * cannot overlap however narrow the margin gets.
  */
 export function runwayBar(runway, { showStop = true } = {}) {
   const available = runway.asda || runway.tora || runway.length;
@@ -634,44 +641,41 @@ export function runwayBar(runway, { showStop = true } = {}) {
   const reject = showStop ? runway.distanceReject : null;
   const decide = showStop ? runway.distanceDecide : null;
   const scale = Math.max(available, reject || 0);
+  const pct = (v) => `${((v / scale) * 100).toFixed(2)}%`;
 
-  const W = 640;
-  const H = 74;
-  const padX = 8;
-  const barY = 22;
-  const barH = 26;
-  const usable = W - padX * 2;
-  const px = (v) => padX + (v / scale) * usable;
+  const margin = runway.distanceMargin ?? (reject ? available - reject : null);
+  const marginOk = Number.isFinite(margin) && margin >= 300;
 
-  const marginOk = Number.isFinite(runway.distanceMargin) && runway.distanceMargin >= 300;
+  return `<div class="rwbar">
+    <div class="rwbar-top">
+      <span class="id ltr">${escapeHtml(runway.identifier)}</span>
+      <span class="len ltr">${fmtNumber(available)} ft</span>
+    </div>
 
-  return `<div class="runway-bar"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img">
-    <rect class="rw-surface" x="${padX}" y="${barY}" width="${usable}" height="${barH}" rx="2"/>
-    <line class="rw-centerline" x1="${padX + 12}" y1="${barY + barH / 2}" x2="${padX + usable - 12}" y2="${barY + barH / 2}"/>
+    <div class="rwbar-track">
+      ${reject ? `<span class="rwbar-used" style="width:${pct(reject)}"></span>` : ''}
+      ${
+        reject
+          ? `<span class="rwbar-margin ${marginOk ? 'ok' : 'bad'}" style="inset-inline-start:${pct(reject)};width:${pct(Math.max(0, available - reject))}"></span>`
+          : ''
+      }
+      ${reject ? `<span class="rwbar-mark" style="inset-inline-start:${pct(reject)}"></span>` : ''}
+      ${
+        decide
+          ? `<span class="rwbar-mark v1" style="inset-inline-start:${pct(decide)}"><i>V1</i></span>`
+          : ''
+      }
+    </div>
 
     ${
       reject
-        ? `<rect class="${marginOk ? 'rw-margin-ok' : 'rw-margin-bad'}" x="${px(reject)}" y="${barY}" width="${Math.max(0, px(available) - px(reject))}" height="${barH}"/>
-           <rect class="rw-used" x="${padX}" y="${barY}" width="${px(reject) - padX}" height="${barH}"/>
-           <line class="rw-mark" x1="${px(reject)}" y1="${barY - 5}" x2="${px(reject)}" y2="${barY + barH + 5}"/>`
+        ? `<div class="rwbar-foot">
+             <span><em>${escapeHtml(t('to.reject'))}</em> <b class="ltr">${fmtNumber(reject)} ft</b></span>
+             <span class="${marginOk ? 'good' : 'bad'}"><em>${escapeHtml(t('to.stopMargin'))}</em> <b class="ltr">+${fmtNumber(margin)} ft</b></span>
+           </div>`
         : ''
     }
-    ${
-      decide
-        ? `<line class="rw-mark" x1="${px(decide)}" y1="${barY - 5}" x2="${px(decide)}" y2="${barY + barH + 5}" stroke="var(--amber)"/>
-           <text class="rw-text-em" x="${px(decide)}" y="${barY - 9}" text-anchor="middle" fill="var(--amber)">V1</text>`
-        : ''
-    }
-
-    <text class="rw-text-em" x="${padX}" y="${barY - 9}" text-anchor="start">${escapeHtml(runway.identifier)}</text>
-    <text class="rw-text" x="${padX + usable}" y="${barY - 9}" text-anchor="end">${fmtNumber(available)} ft</text>
-    ${
-      reject
-        ? `<text class="rw-text" x="${px(reject)}" y="${barY + barH + 17}" text-anchor="middle">${fmtNumber(reject)} ft</text>
-           <text class="rw-text" x="${(px(reject) + px(available)) / 2}" y="${barY + barH + 17}" text-anchor="middle" fill="${marginOk ? 'var(--green)' : 'var(--red)'}">+${fmtNumber(runway.distanceMargin ?? available - reject)} ft</text>`
-        : ''
-    }
-  </svg></div>`;
+  </div>`;
 }
 
 /** Comparison table across every runway SimBrief evaluated. */

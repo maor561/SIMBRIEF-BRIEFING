@@ -33,8 +33,7 @@
 
   --radius: 12px;
   --radius-sm: 8px;
-  --rail: 108px;
-  --header-h: 54px;
+  --rail: 81px;
 
   --mono: ui-monospace, 'SF Mono', 'Cascadia Mono', 'Roboto Mono', Consolas, monospace;
   --sans: system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
@@ -99,7 +98,6 @@ button {
 
 .app {
   display: grid;
-  grid-template-rows: var(--header-h) 1fr;
   height: 100dvh;
 }
 
@@ -117,110 +115,7 @@ button {
   -webkit-overflow-scrolling: touch;
 }
 
-/* ------------------------------------------------------------------ header */
-
-.header {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding-inline: 14px;
-  background: linear-gradient(180deg, #124055, #0a2434);
-  border-block-end: 1px solid var(--line-solid);
-  overflow: hidden;
-}
-
-.header .callsign {
-  font-family: var(--mono);
-  font-size: 19px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  color: var(--amber);
-  white-space: nowrap;
-}
-
-.header .pair {
-  font-family: var(--mono);
-  font-size: 17px;
-  font-weight: 600;
-  white-space: nowrap;
-  letter-spacing: 0.03em;
-}
-
-.header .pair .arrow {
-  color: var(--dimmer);
-  margin-inline: 6px;
-}
-
-.header .facts {
-  display: flex;
-  gap: 16px;
-  align-items: center;
-  min-width: 0;
-  overflow: hidden;
-}
-
-.header .fact {
-  display: flex;
-  flex-direction: column;
-  line-height: 1.15;
-  white-space: nowrap;
-}
-
-.header .fact b {
-  font-family: var(--mono);
-  font-size: 14px;
-  font-weight: 600;
-}
-
-.header .fact span {
-  font-size: 10px;
-  color: var(--dimmer);
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-}
-
-.header .spacer {
-  flex: 1;
-}
-
-.header .tools {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-
-.clock {
-  font-family: var(--mono);
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--green);
-  letter-spacing: 0.05em;
-}
-
-.tool-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 6px 11px;
-  border-radius: 999px;
-  background: var(--panel-2);
-  border: 1px solid var(--line-solid);
-  font-size: 12px;
-  color: var(--dim);
-  white-space: nowrap;
-}
-
-.tool-btn:active {
-  background: var(--panel-3);
-}
-
-.tool-btn.lang {
-  font-family: var(--mono);
-  font-weight: 700;
-  color: var(--text);
-  min-width: 54px;
-  justify-content: center;
-}
+/* -------------------------------------------------------------------- rail */
 
 .demo-flag {
   padding: 3px 9px;
@@ -233,16 +128,55 @@ button {
   text-transform: uppercase;
 }
 
-/* -------------------------------------------------------------------- rail */
-
 .rail {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 10px 8px;
   background: #061a26;
   border-inline-end: 1px solid var(--line-solid);
+  min-height: 0;
+}
+
+.rail-items {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 8px 6px;
   overflow-y: auto;
+  min-height: 0;
+}
+
+/* App-level controls, kept clear of the chapter list. */
+.rail-foot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 6px calc(9px + env(safe-area-inset-bottom));
+  border-block-start: 1px solid var(--line-solid);
+}
+
+.rail-btn {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--panel-2);
+  border: 1px solid var(--line-solid);
+  color: var(--dim);
+}
+
+.rail-btn:active { background: var(--panel-3); }
+
+.rail-btn .glyph {
+  width: 17px;
+  height: 17px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .rail-item {
@@ -250,8 +184,8 @@ button {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 5px;
-  padding: 11px 4px;
+  gap: 4px;
+  padding: 9px 2px;
   border-radius: var(--radius-sm);
   color: var(--dim);
   text-align: center;
@@ -259,8 +193,8 @@ button {
 }
 
 .rail-item .glyph {
-  width: 26px;
-  height: 26px;
+  width: 22px;
+  height: 22px;
   stroke: currentColor;
   fill: none;
   stroke-width: 1.6;
@@ -269,15 +203,10 @@ button {
 }
 
 .rail-item .label {
-  font-size: 11px;
+  font-size: 9.5px;
   font-weight: 600;
-  line-height: 1.2;
-}
-
-.rail-item .step {
-  font-family: var(--mono);
-  font-size: 9px;
-  color: var(--dimmer);
+  line-height: 1.25;
+  letter-spacing: -0.01em;
 }
 
 .rail-item[aria-current='true'] {
@@ -292,16 +221,16 @@ button {
 
 .rail-badge {
   position: absolute;
-  inset-block-start: 6px;
-  inset-inline-end: 8px;
-  min-width: 18px;
-  height: 18px;
-  padding: 0 5px;
+  inset-block-start: 4px;
+  inset-inline-end: 4px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
   border-radius: 999px;
   background: var(--amber);
   color: #191203;
   font-family: var(--mono);
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
   display: grid;
   place-items: center;
@@ -2125,24 +2054,112 @@ table.fuelcheck-table .dim { color: var(--dimmer); }
 
 /* --------------------------------------------------------------- runway UI */
 
-.runway-bar {
-  margin-block: 4px;
+/* Bar scales, text does not -- see runwayBar() for why this is not SVG. */
+.rwbar { margin-block: 2px; }
+
+.rwbar-top,
+.rwbar-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
 }
 
-.runway-bar svg {
-  width: 100%;
-  height: auto;
-  display: block;
+.rwbar-top { margin-block-end: 6px; }
+
+.rwbar-top .id {
+  font-family: var(--mono);
+  font-size: 14px;
+  font-weight: 700;
 }
 
-.rw-surface { fill: #17506a; stroke: var(--line-solid); }
-.rw-used { fill: rgba(79, 168, 255, 0.35); }
-.rw-margin-ok { fill: rgba(58, 212, 138, 0.4); }
-.rw-margin-bad { fill: rgba(255, 92, 102, 0.45); }
-.rw-mark { stroke: var(--text); stroke-width: 1.5; }
-.rw-text { fill: var(--dim); font-family: var(--mono); font-size: 10px; }
-.rw-text-em { fill: var(--text); font-family: var(--mono); font-size: 11px; font-weight: 700; }
-.rw-centerline { stroke: rgba(255, 255, 255, 0.35); stroke-width: 1.5; stroke-dasharray: 9 7; }
+.rwbar-top .len {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--dim);
+}
+
+.rwbar-track {
+  position: relative;
+  height: 26px;
+  border-radius: 3px;
+  background: var(--panel-3);
+  overflow: hidden;
+}
+
+/* Dashes read as a runway without needing a texture. */
+.rwbar-track::after {
+  content: '';
+  position: absolute;
+  inset-block-start: 50%;
+  inset-inline: 12px;
+  height: 2px;
+  transform: translateY(-50%);
+  background: repeating-linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.4) 0 9px,
+    transparent 9px 16px
+  );
+}
+
+.rwbar-used,
+.rwbar-margin {
+  position: absolute;
+  inset-block: 0;
+}
+
+.rwbar-used {
+  inset-inline-start: 0;
+  background: rgba(86, 189, 233, 0.4);
+}
+
+.rwbar-margin.ok { background: rgba(58, 212, 138, 0.45); }
+.rwbar-margin.bad { background: rgba(255, 92, 102, 0.45); }
+
+.rwbar-mark {
+  position: absolute;
+  inset-block: -2px;
+  width: 2px;
+  background: var(--text);
+  transform: translateX(-1px);
+}
+
+.rwbar-mark.v1 { background: var(--amber); }
+
+.rwbar-mark.v1 i {
+  position: absolute;
+  inset-block-end: 100%;
+  inset-inline-start: 50%;
+  transform: translateX(-50%);
+  margin-block-end: 2px;
+  font-style: normal;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--amber);
+}
+
+.rwbar-foot {
+  margin-block-start: 20px;
+  font-size: 11px;
+  color: var(--dim);
+}
+
+.rwbar-foot em {
+  font-style: normal;
+  color: var(--dimmer);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-size: 10px;
+}
+
+.rwbar-foot b {
+  font-family: var(--mono);
+  font-size: 12.5px;
+}
+
+.rwbar-foot .good b { color: var(--green); }
+.rwbar-foot .bad b { color: var(--red); }
 
 table.rw-table {
   width: 100%;
@@ -2521,10 +2538,23 @@ table.rw-table tr.planned td:first-child {
   .rail {
     grid-row: 2;
     flex-direction: row;
+    align-items: stretch;
     border-inline-end: none;
     border-block-start: 1px solid var(--line-solid);
-    padding: 6px 6px calc(6px + env(safe-area-inset-bottom));
+  }
+
+  .rail-items {
+    flex-direction: row;
     overflow-x: auto;
+    overflow-y: hidden;
+    padding: 6px 6px calc(6px + env(safe-area-inset-bottom));
+  }
+
+  .rail-foot {
+    flex-direction: row;
+    border-block-start: none;
+    border-inline-start: 1px solid var(--line-solid);
+    padding: 6px 8px calc(6px + env(safe-area-inset-bottom));
   }
 
   .rail-item {
@@ -2533,8 +2563,7 @@ table.rw-table tr.planned td:first-child {
     padding: 7px 3px;
   }
 
-  .rail-item .glyph { width: 22px; height: 22px; }
-  .rail-item .step { display: none; }
+  .rail-item .label { font-size: 10px; }
   .rail-badge { inset-block-start: 2px; inset-inline-end: 50%; margin-inline-end: -26px; }
 
   .content { padding: 12px 13px 26px; }
@@ -2543,9 +2572,8 @@ table.rw-table tr.planned td:first-child {
 /* ------------------------------------------------------------------ print */
 
 @media print {
-  :root { --header-h: auto; }
   body { background: #fff; color: #000; }
-  .rail, .header .tools, .tool-btn { display: none !important; }
+  .rail { display: none !important; }
   .app { display: block; height: auto; }
   .body { display: block; }
   .content { overflow: visible; padding: 0; }

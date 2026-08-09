@@ -3,21 +3,20 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#080b10">
+<meta name="theme-color" content="#08202e">
 <!-- Standard name plus the apple- prefixed one, which older iOS still needs
      for the app to launch full screen from the home screen. -->
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Briefing">
-<title>תדריך טיסה · SimBrief</title>
+<title>Flight Briefing · SimBrief</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="stylesheet" href="css/brief.css">
 </head>
 <body>
 
 <div id="app" class="app" hidden>
-  <header class="header" id="header"></header>
   <div class="body">
     <nav class="rail" id="rail" aria-label="Briefing chapters"></nav>
     <main class="content" id="content" tabindex="-1"></main>
@@ -26,18 +25,18 @@
 
 <div class="overlay" id="overlay">
   <div class="setup">
-    <h1 id="setup-heading">חיבור ל-SimBrief</h1>
-    <p id="setup-explain">הזן את שם המשתמש או מספר הטייס שלך ב-SimBrief.</p>
+    <h1 id="setup-heading">Connect to SimBrief</h1>
+    <p id="setup-explain">Enter your SimBrief username or pilot ID.</p>
     <!-- novalidate: native `required` blocks the submit event outright, so the
          app's own handler never runs and the button looks dead. We validate
          and report in the app instead. -->
     <form id="setup-form" autocomplete="off" novalidate>
-      <label for="username" id="setup-label">שם משתמש / Pilot ID</label>
+      <label for="username" id="setup-label">Username / Pilot ID</label>
       <input id="username" name="username" type="text" inputmode="latin" autocapitalize="none" spellcheck="false">
-      <button class="btn" type="submit" id="setup-submit">טען תדריך</button>
+      <button class="btn" type="submit" id="setup-submit">Load briefing</button>
     </form>
-    <button class="btn ghost" type="button" id="setup-demo">הצג טיסת הדגמה</button>
-    <div class="hint" id="setup-hint">שם המשתמש נשמר במכשיר בלבד.</div>
+    <button class="btn ghost" type="button" id="setup-demo">Show demo flight</button>
+    <div class="hint" id="setup-hint">Stored on this device only.</div>
     <div class="error" id="setup-error" hidden></div>
   </div>
 </div>
@@ -56,17 +55,14 @@
 
   window.addEventListener('error', function (event) {
     var where = event.filename ? event.filename.split('/').pop() : 'script';
-    report('שגיאת טעינה / Load error\n' + where + ': ' + (event.message || 'unknown'));
+    report('Load error - ' + where + ': ' + (event.message || 'unknown'));
   }, true);
 
   // If the module never signals that it booted, say so rather than hanging.
   window.__briefingBooted = false;
   setTimeout(function () {
     if (!window.__briefingBooted) {
-      report(
-        'הקוד לא נטען. נסה רענון עם ניקוי מטמון, או בדוק חיבור.\n' +
-        'The app script did not start. Try a hard refresh.'
-      );
+      report('The app script did not start. Try a hard refresh.');
     }
   }, 6000);
 })();
