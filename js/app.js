@@ -18,7 +18,7 @@ import renderPerformance from './views/performance.js';
 import renderNavlog, { diffCell, summaryPanel, summaryFlag } from './views/navlog.js';
 import renderAtc from './views/atc.js';
 import { buildFixDetail } from './charts.js';
-import { setActual, classify } from './fuellog.js';
+import { setActual, classify, clearActuals } from './fuellog.js';
 
 const STORAGE_USER = 'sbb.username';
 
@@ -38,6 +38,16 @@ const CHAPTERS = [
   { id: 'navlog', step: '6', render: renderNavlog, icon: 'M4 8.5h14l-3.4-3.4M20 15.5H6l3.4 3.4' }
 ];
 
+/**
+ * Every live pull revalidates with the server rather than trusting the
+ * browser's copy. The API responses carry `stale-while-revalidate`, which lets
+ * the private cache hand back a minutes-old body without asking -- fine for a
+ * CDN, wrong for a crew who just pressed refresh and expects current weather.
+ * The `s-maxage` on those responses still keeps the shared cache in front of
+ * SimBrief and VATSIM, so this costs a round trip, not upstream load.
+ */
+const LIVE_FETCH = { cache: 'no-cache' };
+
 const state = {
   raw: null,
   model: null,
@@ -47,7 +57,10 @@ const state = {
   demo: false,
   loading: false,
   // Live VATSIM staffing: { state: 'loading' | 'ready' | 'error', feed }.
-  vatsim: null
+  vatsim: null,
+  // Live METAR from VATSIM, keyed by ICAO. The OFP snapshot stays the
+  // baseline so the screen still works with no network.
+  liveMetar: null
 };
 
 const el = {
@@ -65,7 +78,7 @@ const el = {
 /* ------------------------------------------------------------------ loading */
 
 async function fetchOfp(username) {
-  const response = await fetch(`api/ofp?username=${encodeURIComponent(username)}`);
+  const response = await fetch(`api/ofp?username=${encodeURIComponent(username)}`, LIVE_FETCH);
   const payload = await response.json();
   if (!response.ok) {
     const err = new Error(payload.message || 'fetch failed');
@@ -100,6 +113,7 @@ async function load({ username, demo = false } = {}) {
     // last session happened to end on.
     state.chapter = 'overview';
     state.vatsim = null;
+    state.liveMetar = null;
 
     el.overlay.hidden = true;
     el.app.hidden = false;
@@ -180,9 +194,11 @@ function renderChapter({ preserveScroll = false } = {}) {
   el.content.innerHTML = chapter.render({
     model: state.model,
     findings: state.findings,
-    vatsim: state.vatsim
+    vatsim: state.vatsim,
+    liveMetar: state.liveMetar
   });
   if (chapter.id === 'atc') ensureVatsim();
+  if (chapter.id === 'weather') ensureLiveMetar();
   // Masonry moves card nodes into freshly built row/column wrappers, so it
   // must run on the flat list renderChapter just produced -- calling it
   // again on an already-laid-out tree would nest wrappers instead of
@@ -212,7 +228,7 @@ async function ensureVatsim() {
   state.vatsim = { state: 'loading', feed: null };
 
   try {
-    const response = await fetch('api/vatsim');
+    const response = await fetch('api/vatsim', LIVE_FETCH);
     if (!response.ok) throw new Error(`vatsim ${response.status}`);
     state.vatsim = { state: 'ready', feed: await response.json() };
   } catch {
@@ -220,6 +236,34 @@ async function ensureVatsim() {
   }
 
   if (state.chapter === 'atc') renderChapter({ preserveScroll: true });
+}
+
+/**
+ * Pulls the current METAR for every field on the plan. Same guard as the
+ * VATSIM fetch: the reader may have moved on before it lands, and repainting
+ * a chapter they left would yank them back.
+ */
+async function ensureLiveMetar() {
+  if (state.liveMetar) return;
+
+  const ids = [state.model.origin, state.model.destination, ...state.model.alternates]
+    .filter(Boolean)
+    .map((a) => a.icao)
+    .filter(Boolean);
+  if (!ids.length) return;
+
+  state.liveMetar = { state: 'loading', metars: {} };
+
+  try {
+    const response = await fetch(`api/metar?ids=${encodeURIComponent(ids.join(','))}`, LIVE_FETCH);
+    if (!response.ok) throw new Error(`metar ${response.status}`);
+    const payload = await response.json();
+    state.liveMetar = { state: 'ready', metars: payload.metars || {}, fetchedAt: payload.fetchedAt };
+  } catch {
+    state.liveMetar = { state: 'error', metars: {} };
+  }
+
+  if (state.chapter === 'weather') renderChapter({ preserveScroll: true });
 }
 
 function goToChapter(id, findingId) {
@@ -329,6 +373,23 @@ document.addEventListener('click', (event) => {
     // Per-card override; leaves the airport's expand-all state alone.
     case 'notam-full':
       trigger.closest('.notam')?.classList.toggle('expanded');
+      break;
+
+    case 'clear-fuel-log':
+      clearActuals(state.model);
+      renderChapter({ preserveScroll: true });
+      break;
+
+    // Controllers come and go, so the feed is worth re-pulling on demand
+    // rather than only on first open.
+    case 'refresh-vatsim':
+      state.vatsim = null;
+      renderChapter({ preserveScroll: true });
+      break;
+
+    case 'refresh-metar':
+      state.liveMetar = null;
+      renderChapter({ preserveScroll: true });
       break;
 
     case 'copy-fpl': {
@@ -510,6 +571,17 @@ function applySetupText() {
 
 // Tells the inline watchdog in index.html that the module graph loaded.
 window.__briefingBooted = true;
+
+// Offline support. Registered after boot so a failure here can never stop the
+// app from starting, and skipped on localhost over plain http where some
+// browsers refuse the registration anyway.
+if ('serviceWorker' in navigator) {
+  addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(() => {
+      /* offline support unavailable; the app still works online */
+    });
+  });
+}
 
 applySetupText();
 

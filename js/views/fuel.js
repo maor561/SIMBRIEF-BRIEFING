@@ -22,6 +22,7 @@ export default function renderFuel({ model }) {
         action: loggedFlag(model, actuals)
       })}
       ${section(t('dep.loading'), 'obstacle', weightsBody(model), { action: tightestFlag(model) })}
+      ${section(t('fuel.extra'), 'obstacle', extraFuelBody(model))}
       ${section(t('crz.impacts'), 'info', impactsTable(model))}
     </div>
   `;
@@ -106,6 +107,30 @@ function fuelPlanBody(model) {
       ${escapeHtml(t('fuel.reserveNote'))} ${fmtWeight(required, units)}
     </div>
   `;
+}
+
+/**
+ * Dispatcher-added fuel, itemised. All-zero buckets are the normal case and
+ * say something worth saying, so an empty list is stated rather than hidden.
+ */
+function extraFuelBody(model) {
+  const buckets = model.fuelExtra || [];
+  if (!buckets.length) {
+    return `<div class="empty-state">${escapeHtml(t('fuel.extraNone'))}</div>`;
+  }
+
+  return `<div class="rows">${buckets
+    .map(
+      (b) => `<div class="row">
+        <span class="grow">
+          ${escapeHtml(b.label)}
+          ${b.required ? `<span class="req-tag">${escapeHtml(t('fuel.required'))}</span>` : ''}
+        </span>
+        ${b.time ? `<span class="val" style="color:var(--dimmer)">${fmtDuration(b.time * 60)}</span>` : ''}
+        <span class="val">${fmtWeight(b.fuel, model.units)}</span>
+      </div>`
+    )
+    .join('')}</div>`;
 }
 
 /* --------------------------------------------------------------- weights */

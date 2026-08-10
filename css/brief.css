@@ -2575,3 +2575,59 @@ table.rw-table tr.planned td:first-child {
   .card, .tile, .notam, .raw-wx, .taf-group { background: #fff !important; color: #000; }
   .tile .value, .finding .title { color: #000 !important; }
 }
+
+/* --------------------------------------------------- late additions */
+
+/* Live-weather banner states. */
+.pane-note.live { color: var(--green); }
+.pane-note.stale { color: var(--amber); }
+
+.pane-note .notam-btn {
+  vertical-align: middle;
+  margin-inline-start: 6px;
+}
+
+.wxrow-age.live {
+  background: var(--green-bg);
+  color: var(--green);
+  font-weight: 700;
+}
+
+/* A bucket the plan depends on, not discretionary fuel. */
+.req-tag {
+  margin-inline-start: 7px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: var(--amber-bg);
+  color: var(--amber);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+
+/* Outward links to the source documents. */
+.doc-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 14px 15px;
+}
+
+.doc-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 14px;
+  border-radius: var(--radius-sm);
+  background: var(--panel-2);
+  border: 1px solid var(--line-solid);
+  color: var(--blue);
+  font-size: 12.5px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.doc-link:hover { background: var(--panel-3); }
+
+/* Section-header buttons sit beside the flag, not on top of it. */
+.sect-head .notam-btn { margin-inline-start: 8px; }

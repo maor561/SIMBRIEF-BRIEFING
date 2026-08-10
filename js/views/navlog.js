@@ -20,7 +20,8 @@ export default function renderNavlog({ model }) {
       ${section(t('crz.title'), 'wind', cruiseFactsBody(model), { action: etopsFlag(model) })}
       ${section(t('crz.stepClimb'), 'aircraft', stepLadder(model))}
       ${section(t('nl.fuelCheck'), 'clock', fuelCheckBody(model, actuals), {
-        action: `<span data-fuel-flag>${summaryFlag(model, actuals)}</span>`
+        action: `<span data-fuel-flag>${summaryFlag(model, actuals)}</span>
+                 <button class="notam-btn" data-action="clear-fuel-log" title="${escapeHtml(t('fuel.clearLog'))}" aria-label="${escapeHtml(t('fuel.clearLog'))}">${icon('obstacle', { size: 16 })}</button>`
       })}
       ${section(t('nav.navlog'), 'routeSwap', fixTable(model), {
         action: `<span class="sect-flag">${model.navlog.length} ${escapeHtml(t('nl.fixes'))}</span>`

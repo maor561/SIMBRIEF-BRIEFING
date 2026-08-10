@@ -31,6 +31,14 @@ export default function renderOverview({ model, findings }) {
       ${section(t('ov.dispatch'), 'headset', dispatchBody(model))}
       ${section(t('common.route'), 'routeSwap', routeBody(model))}
       ${
+        model.alternates.length
+          ? section(t('ov.diversion'), 'airspace', diversionBody(model), {
+              action: `<span class="sect-flag">${escapeHtml(model.alternates.map((a) => a.icao).join(' · '))}</span>`
+            })
+          : ''
+      }
+      ${documentsSection(model)}
+      ${
         findings.length
           ? section(t('sum.watchItems'), 'obstacle', findingsList(findings, { showChapter: true }), {
               cls: critical ? 'accent-red' : 'accent-amber'
@@ -209,6 +217,120 @@ function ofpVersion(generatedAt) {
   if (Number.isNaN(d.getTime())) return null;
   const p = (n, w = 2) => String(n).padStart(w, '0');
   return `${d.getUTCFullYear()}${p(d.getUTCMonth() + 1)}${p(d.getUTCDate())} ${p(d.getUTCHours())}${p(d.getUTCMinutes())}${p(d.getUTCSeconds())}`;
+}
+
+/* ------------------------------------------------------------- documents */
+
+/**
+ * Links out to the sources this briefing was built from. Useful as the
+ * authority when a rendered figure looks wrong, and both open externally so
+ * nothing here has to reproduce them.
+ */
+function documentsSection(model) {
+  const links = [
+    model.links.pdf ? { href: model.links.pdf, label: t('ov.openPdf') } : null,
+    model.links.skyvector ? { href: model.links.skyvector, label: t('ov.openMap') } : null
+  ].filter(Boolean);
+
+  if (!links.length) return '';
+
+  return section(
+    t('ov.documents'),
+    'info',
+    `<div class="doc-links">${links
+      .map(
+        (l) => `<a class="doc-link" href="${escapeHtml(l.href)}" target="_blank" rel="noopener noreferrer">
+          ${icon('info', { size: 15 })}${escapeHtml(l.label)}
+        </a>`
+      )
+      .join('')}</div>`
+  );
+}
+
+/* ------------------------------------------------------------- diversion */
+
+/**
+ * What a diversion actually costs: how far, how long, how much fuel, and by
+ * what routing. These are the figures the decision turns on, so they belong
+ * on the cover rather than buried with the alternate's weather.
+ */
+function diversionBody(model) {
+  const units = model.units === 'lbs' ? 'lb' : 'kg';
+
+  return model.alternates
+    .map((alternate, i) => {
+      // SimBrief only routes to the first alternate, so only that one can
+      // show a track; any further alternates carry their own figures alone.
+      const legs = i === 0 ? model.alternateNavlog : [];
+
+      return `
+        ${i ? '<div class="sub-head"></div>' : ''}
+        <div class="wx-head">
+          <span class="wx-role">ALTN${model.alternates.length > 1 ? ` ${i + 1}` : ''}</span>
+          <span class="wx-name ltr">${escapeHtml([alternate.icao, alternate.iata, alternate.name].filter(Boolean).join(' - '))}</span>
+        </div>
+
+        <div class="figs">
+          ${fig(t('arr.altnDistance'), fmtNumber(alternate.distance), 'nm')}
+          ${fig(t('arr.altnEte'), fmtDuration(alternate.ete))}
+          ${fig(t('arr.altnBurn'), fmtNumber(alternate.burn), units)}
+          ${fig(t('arr.altnCruise'), alternate.cruiseAltitude ? `FL${Math.round(alternate.cruiseAltitude / 100)}` : '—')}
+        </div>
+
+        <div class="sect-fields">
+          ${field(t('common.runway'), alternate.plannedRunway)}
+          ${field(t('common.elevation'), alternate.elevation === null ? null : `${fmtNumber(alternate.elevation)} ft`)}
+          ${field(t('common.transLevel'), alternate.transLevel ? `FL${Math.round(alternate.transLevel / 100)}` : null)}
+        </div>
+
+        ${
+          alternate.route
+            ? `<div class="sect-field">
+                 <span class="k">${escapeHtml(t('arr.altnRoute'))}</span>
+                 <div class="wxrow-text">${escapeHtml(alternate.route)}</div>
+               </div>`
+            : ''
+        }
+
+        ${legs.length ? legTable(legs, model) : ''}
+      `;
+    })
+    .join('');
+}
+
+function fig(label, value, unit = '') {
+  return `<div class="fig">
+    <span class="k">${escapeHtml(label)}</span>
+    <span class="v ltr">${value}${unit ? `<i> ${escapeHtml(unit)}</i>` : ''}</span>
+  </div>`;
+}
+
+/** The routing to the alternate, fix by fix. */
+function legTable(legs, model) {
+  const rows = legs
+    .map(
+      (f) => `<tr>
+        <td><b>${escapeHtml(f.ident)}</b></td>
+        <td>${f.via ? escapeHtml(f.via) : '—'}</td>
+        <td>${f.altitude ? fmtNumber(f.altitude) : '—'}</td>
+        <td>${Number.isFinite(f.distance) ? fmtNumber(f.distance) : '—'}</td>
+        <td>${Number.isFinite(f.timeTotal) ? fmtDuration(f.timeTotal) : '—'}</td>
+        <td>${Number.isFinite(f.fuelOnBoard) ? fmtNumber(f.fuelOnBoard) : '—'}</td>
+      </tr>`
+    )
+    .join('');
+
+  return `<div class="table-scroll"><table class="rw-table navlog-table">
+    <thead><tr>
+      <th>${escapeHtml(t('nl.ident'))}</th>
+      <th>${escapeHtml(t('nl.via'))}</th>
+      <th>ALT</th>
+      <th>${escapeHtml(t('common.distance'))}</th>
+      <th>${escapeHtml(t('common.time'))}</th>
+      <th>${escapeHtml(t('common.fuel'))}</th>
+    </tr></thead>
+    <tbody>${rows}</tbody>
+  </table></div>`;
 }
 
 /* ----------------------------------------------------------------- route */

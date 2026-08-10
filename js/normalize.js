@@ -357,6 +357,21 @@ export function normalizeOfp(raw) {
 
     navlog: fixes,
 
+    // Dispatcher-added fuel, itemised. `required` marks a bucket the plan
+    // depends on rather than one held as discretion.
+    fuelExtra: arr(raw.fuel_extra?.bucket)
+      .map((b) => ({
+        label: str(b?.label),
+        fuel: num(b?.fuel),
+        time: num(b?.time),
+        required: flag(b?.required)
+      }))
+      .filter((b) => b.label && (b.fuel || b.time)),
+
+    // The routing to the first alternate. SimBrief supplies it as its own
+    // navlog rather than hanging it off the alternate airport.
+    alternateNavlog: arr(raw.alternate_navlog?.fix).map(normalizeFix),
+
     fuel: {
       taxi: num(fuel.taxi),
       enrouteBurn: num(fuel.enroute_burn),
@@ -441,7 +456,9 @@ export function normalizeOfp(raw) {
 
     links: {
       skyvector: str(raw.links?.skyvector) || str(raw.links),
-      map: str(raw.map_data)
+      map: str(raw.map_data),
+      // SimBrief's own PDF of this OFP: the document the briefing renders.
+      pdf: raw.files?.pdf?.link ? `${str(raw.files?.directory) || ''}${str(raw.files.pdf.link)}` : null
     }
   };
 

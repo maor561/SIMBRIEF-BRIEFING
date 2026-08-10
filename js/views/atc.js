@@ -27,7 +27,8 @@ export default function renderAtc({ model, vatsim }) {
   return `
     <div class="cover">
       ${section(t('atc.stations'), 'headset', stationsBody(model, groups, vatsim), {
-        action: feedBadge(vatsim, online)
+        action: `${feedBadge(vatsim, online)}
+                 <button class="notam-btn" data-action="refresh-vatsim" title="${escapeHtml(t('atc.refresh'))}" aria-label="${escapeHtml(t('atc.refresh'))}">${icon('routeSwap', { size: 16 })}</button>`
       })}
       ${section(t('atc.flightPlan'), 'routeSwap', flightPlanBody(model))}
     </div>

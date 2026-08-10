@@ -14,9 +14,17 @@ import { escapeHtml, fmtNumber, parseMetar, parseTaf, ceilingOf, highlightWx } f
 import { section, icon, chip, categoryDot } from '../ui.js';
 import { weatherStrip, buildFixDetail, defaultFix, chartsBody } from '../charts.js';
 
-export default function renderWeather({ model }) {
+export default function renderWeather({ model, liveMetar }) {
+  // A live METAR supersedes the OFP's snapshot for display; the snapshot is
+  // what remains when there is no network.
+  const live = liveMetar?.state === 'ready' ? liveMetar.metars : {};
+  const withLive = (airport) =>
+    airport && live[airport.icao] && live[airport.icao] !== airport.metar
+      ? { ...airport, metar: live[airport.icao], metarTime: liveMetar.fetchedAt, metarIsLive: true }
+      : airport;
+
   const alternates = model.alternates.map((a, i) =>
-    airportBlock(a, model.alternates.length > 1 ? `ALTN ${i + 1}` : 'ALTN', [a.plannedRunway], a.plannedRunway)
+    airportBlock(withLive(a), model.alternates.length > 1 ? `ALTN ${i + 1}` : 'ALTN', [a.plannedRunway], a.plannedRunway)
   );
 
   return `
@@ -25,17 +33,17 @@ export default function renderWeather({ model }) {
         <button class="chart-tab" data-action="pane-tab" data-show="wx" aria-selected="true">WX</button>
         <button class="chart-tab" data-action="pane-tab" data-show="charts" aria-selected="false">${escapeHtml(t('wx.tabCharts'))}</button>
       </div>
-      ${updatedNote(model)}
+      ${updatedNote(model, liveMetar)}
 
       <div class="cover" data-pane="wx">
         ${section(t('dep.title'), null, airportBlock(
-          model.origin,
+          withLive(model.origin),
           'DEP',
           model.tlr.takeoff?.runways?.map((r) => r.identifier),
           model.tlr.takeoff?.plannedRunway || model.origin?.plannedRunway
         ))}
         ${section(t('arr.title'), null, airportBlock(
-          model.destination,
+          withLive(model.destination),
           'DEST',
           model.tlr.landing?.runways?.map((r) => r.identifier),
           model.tlr.landing?.plannedRunway || model.destination?.plannedRunway
@@ -54,9 +62,28 @@ export default function renderWeather({ model }) {
 
 /* ------------------------------------------------------------- freshness */
 
-function updatedNote(model) {
+/**
+ * Says where the weather on screen came from. A live pull is the useful
+ * state; without one the OFP snapshot is all there is, and its age is what
+ * matters.
+ */
+function updatedNote(model, liveMetar) {
+  const refresh = `<button class="notam-btn" data-action="refresh-metar" title="${escapeHtml(t('wx.refresh'))}" aria-label="${escapeHtml(t('wx.refresh'))}">${icon('routeSwap', { size: 15 })}</button>`;
+
+  if (liveMetar?.state === 'loading') {
+    return `<div class="pane-note"><span class="spinner spinner-sm"></span> ${escapeHtml(t('wx.fetchingLive'))}</div>`;
+  }
+
+  if (liveMetar?.state === 'ready' && Object.keys(liveMetar.metars).length) {
+    const age = ageToken(minutesSince(liveMetar.fetchedAt));
+    return `<div class="pane-note live">${escapeHtml(t('wx.liveMetar'))}${age ? ` · <span class="ltr">${age}</span>` : ''} ${refresh}</div>`;
+  }
+
   const age = ageToken(minutesSince(model.generatedAt));
-  return age ? `<div class="pane-note">${escapeHtml(t('wx.updated'))} <span class="ltr">${age}</span></div>` : '';
+  const failed = liveMetar?.state === 'error';
+  return `<div class="pane-note${failed ? ' stale' : ''}">
+    ${escapeHtml(failed ? t('wx.liveFailed') : t('wx.fromOfp'))}${age ? ` · ${escapeHtml(t('wx.updated'))} <span class="ltr">${age}</span>` : ''} ${refresh}
+  </div>`;
 }
 
 function minutesSince(value) {
@@ -79,6 +106,9 @@ function ageToken(minutes) {
  * only genuinely dead data gets the red EXPIRED.
  */
 function metarAgeBadge(airport) {
+  if (airport.metarIsLive) {
+    return `<span class="wxrow-age live">${escapeHtml(t('wx.live'))}</span>`;
+  }
   const minutes = minutesSince(airport.metarTime);
   if (minutes === null) return '';
   if (minutes > 240) return `<span class="wxrow-age bad">${escapeHtml(t('wx.expired'))}</span>`;
