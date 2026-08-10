@@ -132,6 +132,7 @@ const STRINGS = {
   'atc.pos.app': 'APPROACH',
   'atc.pos.ctr': 'CENTER',
 
+  'fuel.logHint': 'Log actual fuel at each fix on the Navlog screen to plot it here.',
   'fuel.reserveNote': 'Alternate plus final reserve must remain at landing:',
 
   'notam.title': 'NOTAMs',

@@ -21,6 +21,7 @@ import {
 } from './decode.js';
 import { flushCard, chip, icon } from './ui.js';
 import { THRESHOLDS } from './analyze.js';
+import { classify } from './fuellog.js';
 
 /**
  * Enroute NOTAMs, cut down to something readable.
@@ -378,7 +379,24 @@ export function dominantCruiseAltitude(model) {
 
 /* ------------------------------------------------------------- fuel curve */
 
-export function fuelCurve(model) {
+/**
+ * Keeps a label inside the chart when its marker sits at either end. A
+ * centred label on the first or last fix has half its text hanging outside
+ * the viewBox, which clips it -- the tightest point being the very first fix
+ * rendered "PERAL" as "ERAL".
+ */
+function edgeAnchor(px, width, pad = 26) {
+  if (px < pad) return 'start';
+  if (px > width - pad) return 'end';
+  return 'middle';
+}
+
+/**
+ * Planned fuel against the minimum required, with the readings logged on the
+ * navlog screen drawn on top so plan and actual can be compared by eye rather
+ * than by reading two tables. `actuals` is the fix-index map from fuellog.js.
+ */
+export function fuelCurve(model, actuals = {}) {
   const fixes = model.navlog.filter((f) => Number.isFinite(f.fuelOnBoard) && Number.isFinite(f.fuelMinOnBoard));
   if (fixes.length < 2) return `<div class="empty-state">${escapeHtml(t('common.notAvailable'))}</div>`;
 
@@ -389,7 +407,13 @@ export function fuelCurve(model) {
   const top = 12;
   const bottom = H - 26;
 
-  const maxFuel = Math.max(...fixes.map((f) => f.fuelOnBoard));
+  // Readings can sit above the planned curve, so the scale has to cover them
+  // too or an over-fuelled point would be drawn off the top of the chart.
+  const logged = fixes
+    .map((f, i) => ({ i, fix: f, actual: actuals[f.index] }))
+    .filter((p) => Number.isFinite(p.actual));
+
+  const maxFuel = Math.max(...fixes.map((f) => f.fuelOnBoard), ...logged.map((p) => p.actual));
   const x = (i) => padL + (i / (fixes.length - 1)) * (W - padL - padR);
   const y = (v) => bottom - (v / maxFuel) * (bottom - top);
 
@@ -407,6 +431,26 @@ export function fuelCurve(model) {
   const tightest = model.fuelTightest;
   const tightestIndex = tightest ? fixes.findIndex((f) => f.index === tightest.fix.index) : -1;
 
+  // The logged readings: a track joining them, then a dot per point carrying
+  // the same colour the fuel-check table gives that reading.
+  const actualTrack =
+    logged.length > 1
+      ? `<path d="${logged.map((p, n) => `${n ? 'L' : 'M'}${x(p.i).toFixed(1)},${y(p.actual).toFixed(1)}`).join(' ')}"
+              fill="none" stroke="var(--text)" stroke-width="1.6" stroke-dasharray="2 3" opacity=".7"/>`
+      : '';
+
+  const actualDots = logged
+    .map((p) => {
+      const { state } = classify(p.fix, p.actual, model.fuel.contingency);
+      const colour =
+        state === 'onPlan' ? 'var(--green)' : state === 'under' ? 'var(--amber)' : 'var(--red)';
+      return `<circle class="fuel-actual-dot" cx="${x(p.i).toFixed(1)}" cy="${y(p.actual).toFixed(1)}" r="3.6"
+                      fill="${colour}" stroke="var(--panel)" stroke-width="1.4"><title>${escapeHtml(
+                        `${p.fix.ident} ${fmtWeight(p.actual, model.units)}`
+                      )}</title></circle>`;
+    })
+    .join('');
+
   return `
     <div style="padding:11px 13px 0">
       <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block">
@@ -417,15 +461,29 @@ export function fuelCurve(model) {
           tightestIndex >= 0
             ? `<line x1="${x(tightestIndex).toFixed(1)}" y1="${top}" x2="${x(tightestIndex).toFixed(1)}" y2="${bottom}" stroke="var(--amber)" stroke-width="1" stroke-dasharray="3 3"/>
                <circle cx="${x(tightestIndex).toFixed(1)}" cy="${y(fixes[tightestIndex].fuelOnBoard).toFixed(1)}" r="4" fill="var(--amber)"/>
-               <text x="${x(tightestIndex).toFixed(1)}" y="${bottom + 16}" text-anchor="middle" fill="var(--amber)" font-family="var(--mono)" font-size="10">${escapeHtml(fixes[tightestIndex].ident)}</text>`
+               <text x="${x(tightestIndex).toFixed(1)}" y="${bottom + 16}" text-anchor="${edgeAnchor(x(tightestIndex), W)}" fill="var(--amber)" font-family="var(--mono)" font-size="10">${escapeHtml(fixes[tightestIndex].ident)}</text>`
             : ''
         }
+        ${actualTrack}
+        ${actualDots}
       </svg>
     </div>
     <div style="display:flex;gap:14px;padding:8px 13px 11px;font-size:11px;color:var(--dim);flex-wrap:wrap">
       <span><span style="display:inline-block;width:14px;height:2px;background:var(--blue);vertical-align:middle"></span> ${escapeHtml(t('crz.fuelOnBoard'))}</span>
       <span><span style="display:inline-block;width:14px;height:2px;background:var(--red);vertical-align:middle"></span> ${escapeHtml(t('crz.fuelMin'))}</span>
+      <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--text);vertical-align:middle"></span> ${escapeHtml(t('nl.actual'))}</span>
     </div>
+    ${
+      logged.length
+        ? `<div class="row" style="background:var(--panel-2)">
+             <span class="grow">${escapeHtml(t('nl.logged'))} · <span class="ltr">${logged.length} / ${fixes.length}</span></span>
+             <span class="val ltr">${escapeHtml(logged[logged.length - 1].fix.ident)} ${fmtWeight(
+               logged[logged.length - 1].actual,
+               model.units
+             )}</span>
+           </div>`
+        : `<div class="atc-note">${icon('info', { size: 13 })} ${escapeHtml(t('fuel.logHint'))}</div>`
+    }
     ${
       tightest
         ? `<div class="row" style="background:var(--panel-2)">

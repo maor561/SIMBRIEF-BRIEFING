@@ -354,8 +354,13 @@ document.addEventListener('input', (event) => {
   const input = event.target.closest('[data-action="actual-fuel"]');
   if (!input) return;
 
+  // The field is type="text" to get the plain numeric keypad on iOS, so it
+  // has to reject anything that is not a digit itself.
+  const digits = input.value.replace(/\D/g, '');
+  if (digits !== input.value) input.value = digits;
+
   const index = Number(input.dataset.fixIndex);
-  const actuals = setActual(state.model, index, input.value);
+  const actuals = setActual(state.model, index, digits);
   const fix = state.model.navlog.find((f) => f.index === index);
 
   const cell = document.querySelector(`[data-fuel-diff="${index}"]`);

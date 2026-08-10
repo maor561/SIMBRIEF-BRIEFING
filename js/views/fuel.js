@@ -10,16 +10,29 @@ import { t } from '../i18n.js';
 import { escapeHtml, fmtNumber, fmtWeight, fmtDuration } from '../decode.js';
 import { section, meter, icon } from '../ui.js';
 import { fuelCurve, impactsTable } from '../charts.js';
+import { getActuals, summarise } from '../fuellog.js';
 
 export default function renderFuel({ model }) {
+  const actuals = getActuals(model);
+
   return `
     <div class="cover">
       ${section(t('dep.fuelPlan'), 'clock', fuelPlanBody(model), { action: enduranceFlag(model) })}
-      ${section(t('crz.fuelCurve'), 'routeSwap', fuelCurve(model))}
+      ${section(t('crz.fuelCurve'), 'routeSwap', fuelCurve(model, actuals), {
+        action: loggedFlag(model, actuals)
+      })}
       ${section(t('dep.loading'), 'obstacle', weightsBody(model), { action: tightestFlag(model) })}
       ${section(t('crz.impacts'), 'info', impactsTable(model))}
     </div>
   `;
+}
+
+/** Mirrors the navlog verdict, so the chart's header says the same thing. */
+function loggedFlag(model, actuals) {
+  const s = summarise(model, actuals);
+  if (!s.count) return '';
+  const tone = { onPlan: 'good', under: 'warn', overBurn: 'bad', belowMin: 'bad' }[s.state] || '';
+  return `<span class="sect-flag ${tone}">${escapeHtml(t(`nl.state.${s.state}`))}</span>`;
 }
 
 /* ------------------------------------------------------------------ fuel */

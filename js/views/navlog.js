@@ -103,7 +103,11 @@ function fuelRow(model, fix, actuals) {
     <td>${fmtNumber(fix.fuelOnBoard)}</td>
     <td class="dim">${Number.isFinite(fix.fuelMinOnBoard) ? fmtNumber(fix.fuelMinOnBoard) : '—'}</td>
     <td>
-      <input class="fuel-input" type="number" inputmode="numeric" step="10"
+      <!-- text + numeric inputmode + a digits-only pattern, not type="number":
+           on iOS that combination is what raises the plain 0-9 keypad, while
+           type="number" still offers punctuation a fuel figure never needs. -->
+      <input class="fuel-input" type="text" inputmode="numeric" pattern="[0-9]*"
+             enterkeyhint="done" autocomplete="off" maxlength="6"
              data-action="actual-fuel" data-fix-index="${fix.index}"
              value="${Number.isFinite(actual) ? actual : ''}"
              aria-label="${escapeHtml(`${t('nl.actual')} ${fix.ident}`)}">

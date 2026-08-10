@@ -810,13 +810,6 @@ table.fuelcheck-table .dim { color: var(--dimmer); }
   border-color: var(--blue);
 }
 
-/* Chrome's spinners steal room from a field this narrow. */
-.fuel-input::-webkit-outer-spin-button,
-.fuel-input::-webkit-inner-spin-button {
-  appearance: none;
-  margin: 0;
-}
-
 .fuel-diff {
   font-family: var(--mono);
   font-weight: 700;
