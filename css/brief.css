@@ -363,12 +363,22 @@ button {
   display: block;
 }
 
+/*
+ * Title on the left, controls on the right. It wraps rather than pushing the
+ * panel wider: several headers carry a button and a couple of chips, which at
+ * phone width is more than one line can hold.
+ */
 .sect-head {
   display: flex;
   align-items: center;
   gap: 9px;
+  flex-wrap: wrap;
   padding-block-end: 10px;
   color: var(--text);
+}
+
+.sect-head h2 {
+  min-width: 0;
 }
 
 .sect-head h2 {
@@ -694,6 +704,14 @@ table.navlog-table th { padding: 6px 8px; }
   background: var(--panel);
   padding: 12px 15px;
   border-inline-end: 1px solid var(--line-solid);
+  /* A grid track will not shrink below its content unless told; without this
+     a long figure widens the whole row instead of wrapping inside its cell. */
+  min-width: 0;
+}
+
+.fig .v,
+.fig .k {
+  overflow-wrap: anywhere;
 }
 
 .fig .k {
@@ -3243,14 +3261,24 @@ table.rw-table tr.planned td:first-child {
     align-items: stretch;
     border-inline-end: none;
     border-block-start: 1px solid var(--line-solid);
+    /* A grid item defaults to min-width:auto, which is its content width.
+       Without this the bar refuses to be narrower than all its chapters laid
+       out at once and drags the whole page wider than the screen. */
+    min-width: 0;
   }
 
   .rail-items {
     flex-direction: row;
     overflow-x: auto;
     overflow-y: hidden;
+    /* Same trap one level down: the scroller cannot scroll until it is
+       allowed to be smaller than the strip of chapters inside it. */
+    min-width: 0;
+    scrollbar-width: none;
     padding: 6px 6px calc(6px + env(safe-area-inset-bottom));
   }
+
+  .rail-items::-webkit-scrollbar { display: none; }
 
   .rail-foot {
     flex-direction: row;
@@ -3269,6 +3297,55 @@ table.rw-table tr.planned td:first-child {
   .rail-badge { inset-block-start: 2px; inset-inline-end: 50%; margin-inline-end: -26px; }
 
   .content { padding: 12px 13px 26px; }
+}
+
+/*
+ * Phone width. Eight chapters plus the clock cannot all sit across 393px at
+ * tablet sizing, so the tiles tighten until they nearly do and the strip
+ * scrolls for the remainder -- which beats shrinking every label into
+ * something unreadable to avoid a swipe.
+ */
+@media (max-width: 460px) {
+  /*
+   * The four facts sit in two columns knocked out of the curve. At this width
+   * two columns are wider than the arch they sit inside, so they stack --
+   * taller, but inside the drawing instead of hanging off both ends of it.
+   */
+  .sched-facts {
+    grid-template-columns: auto;
+    gap: 1px;
+    padding: 5px 10px;
+  }
+
+  .sched-facts div,
+  .sched-facts div:nth-child(even) {
+    text-align: center;
+  }
+
+  .sched-facts div { font-size: 10.5px; }
+  .sched-facts b { font-size: 11.5px; }
+
+  .rail-item {
+    min-width: 52px;
+    padding: 6px 2px;
+  }
+
+  .rail-item .label {
+    font-size: 8.5px;
+    letter-spacing: 0.01em;
+  }
+
+  .rail-item .glyph {
+    width: 19px;
+    height: 19px;
+  }
+
+  .rail-foot {
+    padding-inline: 6px;
+    gap: 4px;
+  }
+
+  .content { padding: 10px 10px 22px; }
 }
 
 /* ------------------------------------------------------------------ print */
