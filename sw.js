@@ -41,7 +41,11 @@ const SHELL_FILES = [
   './js/views/fuel.js',
   './js/views/performance.js',
   './js/views/atc.js',
-  './js/views/navlog.js'
+  './js/views/navlog.js',
+  './js/views/report.js',
+  './js/timeline.js',
+  './js/notamlog.js',
+  './js/wind.js'
 ];
 
 self.addEventListener('install', (event) => {

@@ -29,6 +29,7 @@ import {
 import { runwayWind } from '../js/wind.js';
 import { notamKey, isRead, markRead, markUnread, unreadCount } from '../js/notamlog.js';
 import { aircraftPoint } from '../js/views/overview.js';
+import { clockDelta } from '../js/views/report.js';
 import {
   PHASES,
   getTimeline,
@@ -660,6 +661,27 @@ check('walks the aircraft along the profile with the clock', () => {
   );
   assert.equal(landed.flying, false);
   assert.equal(landed.x, end.x, 'a short flight still finishes at the far end');
+});
+
+check('reports a delay only when the two times are the same flight', () => {
+  const planned = new Date(Date.UTC(2026, 2, 11, 18, 30));
+
+  // Seventeen minutes late.
+  const late = clockDelta(new Date(Date.UTC(2026, 2, 11, 18, 47)), planned);
+  assert.equal(late.text, '+0:17');
+  assert.equal(late.tone, 'warn');
+
+  // Early is good news.
+  const early = clockDelta(new Date(Date.UTC(2026, 2, 11, 18, 22)), planned);
+  assert.equal(early.text, '−0:08');
+  assert.equal(early.tone, 'good');
+
+  // Within a minute is on plan, not a delay.
+  assert.equal(clockDelta(new Date(Date.UTC(2026, 2, 11, 18, 30, 30)), planned).tone, 'good');
+
+  // An OFP flown the next evening is not a twenty-hour delay; say nothing.
+  assert.equal(clockDelta(new Date(Date.UTC(2026, 2, 12, 18, 30)), planned), null);
+  assert.equal(clockDelta(null, planned), null);
 });
 
 check('can be told to ask at every fix instead', () => {

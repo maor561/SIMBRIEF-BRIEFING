@@ -16,6 +16,7 @@ import renderNotams from './views/notams.js';
 import renderFuel from './views/fuel.js';
 import renderPerformance from './views/performance.js';
 import renderNavlog, { diffCell, summaryPanel, summaryFlag } from './views/navlog.js';
+import renderReport from './views/report.js';
 import renderAtc from './views/atc.js';
 import { buildFixDetail } from './charts.js';
 import { setActual, classify, clearActuals, getActuals } from './fuellog.js';
@@ -45,7 +46,8 @@ const CHAPTERS = [
   { id: 'fuel', step: '3', render: renderFuel, icon: 'M5 21V5a2 2 0 0 1 2-2h5a2 2 0 0 1 2 2v16M3 21h13M17 8l2.4 2.4a2 2 0 0 1 .6 1.4V17a1.6 1.6 0 0 0 3.2 0v-6M8 8h3' },
   { id: 'performance', step: '4', render: renderPerformance, icon: 'M3 19h18M4.5 14.5l3.5.6 9.2-8a1.7 1.7 0 0 1 2.4 2.4l-8 9.2.6 3.5-1.8-.6-1.4-3-3-1.4z' },
   { id: 'atc', step: '5', render: renderAtc, icon: 'M4 15v-3a8 8 0 0 1 16 0v3M4 15a2 2 0 0 0 2 2h1.2v-5.4H6a2 2 0 0 0-2 2zM20 15a2 2 0 0 1-2 2h-1.2v-5.4H18a2 2 0 0 1 2 2zM19 17.6v.6a2.6 2.6 0 0 1-2.6 2.6H13' },
-  { id: 'navlog', step: '6', render: renderNavlog, icon: 'M4 8.5h14l-3.4-3.4M20 15.5H6l3.4 3.4' }
+  { id: 'navlog', step: '6', render: renderNavlog, icon: 'M4 8.5h14l-3.4-3.4M20 15.5H6l3.4 3.4' },
+  { id: 'report', step: '7', render: renderReport, icon: 'M6.5 3h7.6L19 7.9V21H6.5zM14 3v5h5M9.5 13h6M9.5 16.5h4' }
 ];
 
 /**
@@ -481,11 +483,16 @@ document.addEventListener('click', (event) => {
     // Stamping takeoff re-anchors every time in the briefing, so the whole
     // chapter is rebuilt rather than patched -- the navlog, the fuel checks
     // and the schedule all move with it.
-    case 'phase-stamp':
-      state.timeline = stampPhase(state.model, trigger.dataset.phase);
+    case 'phase-stamp': {
+      const phase = trigger.dataset.phase;
+      state.timeline = stampPhase(state.model, phase);
       updateFuelPrompt();
-      renderChapter({ preserveScroll: true });
+      // Touchdown is what the report was waiting for, so it opens itself
+      // rather than leaving the crew to go looking for it.
+      if (phase === 'landing') goToChapter('report');
+      else renderChapter({ preserveScroll: true });
       break;
+    }
 
     case 'phase-clear':
       state.timeline = clearPhase(state.model, trigger.dataset.phase);
