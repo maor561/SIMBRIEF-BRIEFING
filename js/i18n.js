@@ -223,6 +223,8 @@ const STRINGS = {
   'install.add': 'Install as an app',
   'install.manual': 'Use Share ▸ Add to Home Screen',
 
+  'ov.toTakeoff': 'To takeoff',
+  'ov.pastEtot': 'Past ETOT',
   'ov.divertNow': 'If you divert now',
   'ov.onBoard': 'Fuel on board',
   'ov.landWith': 'Would land at',

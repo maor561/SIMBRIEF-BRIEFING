@@ -10,7 +10,7 @@ import { escapeHtml, fmtZulu, fmtDuration, fmtNumber } from './decode.js';
 import { getNotamFilter, notamControls, notamListMarkup } from './ui.js';
 import { layoutMasonry } from './masonry.js';
 
-import renderOverview, { positionAircraft } from './views/overview.js';
+import renderOverview, { positionAircraft, tickCountdown } from './views/overview.js';
 import renderWeather from './views/weather.js';
 import renderNotams from './views/notams.js';
 import renderFuel from './views/fuel.js';
@@ -248,6 +248,9 @@ function renderChapter({ preserveScroll = false } = {}) {
   // rebalancing them. Any change that affects a card's height (like the
   // NOTAM filter below) goes through a full renderChapter, not a DOM patch.
   layoutMasonry(el.content);
+  // Filled straight away rather than on the next tick, so it never paints
+  // blank for a second when the chapter opens.
+  if (chapter.id === 'overview') tickCountdown(state.model, state.timeline, el.content);
   el.content.scrollTop = scrollTop;
 }
 
@@ -762,8 +765,9 @@ setInterval(() => {
   }
 
   // The aircraft on the schedule curve moves the same way: two custom
-  // properties, no re-render.
+  // properties, no re-render. The countdown to takeoff repaints with it.
   positionAircraft(state.model, state.timeline);
+  tickCountdown(state.model, state.timeline);
 }, 1000);
 
 /* ---------------------------------------------------------- fuel prompt */

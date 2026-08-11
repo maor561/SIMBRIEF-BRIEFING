@@ -303,6 +303,7 @@ function scheduleBand(model, timeline) {
         <path class="sched-curve" d="${path}"/>
       </svg>
       <span class="sched-duration ltr">${fmtDuration(times.estTimeEnroute ?? times.estBlock)}</span>
+      ${countdownMarkup(model, timeline)}
       ${dots}
       <span class="sched-plane${plane.flying ? ' flying' : ''}${
         plane.flying || clock.started ? '' : ' parked'
@@ -323,6 +324,62 @@ function scheduleBand(model, timeline) {
     </div>
     ${phaseChain(model, timeline)}
   </div>`;
+}
+
+/* ------------------------------------------------------------- countdown */
+
+/**
+ * The time left until the planned wheels-up, sitting inside the arch.
+ *
+ * It counts past zero rather than stopping there. A departure that has slipped
+ * is the case worth showing, and a timer frozen at 0:00 says nothing about how
+ * far behind the flight has fallen.
+ *
+ * Gone the moment takeoff is stamped: from then on the real clock has taken
+ * over and a countdown to a time that has already happened is clutter.
+ */
+function countdownMarkup(model, timeline) {
+  if (actualOff(timeline)) return '';
+
+  const target = model.times.estOff || model.times.schedOff || model.times.estOut;
+  if (!target) return '';
+
+  // A plan from another day would show a countdown of hundreds of hours, which
+  // is noise rather than information.
+  if (Math.abs(target.getTime() - Date.now()) > 12 * 3600 * 1000) return '';
+
+  return `<div class="sched-countdown" data-countdown="${target.getTime()}">
+    <span class="k"></span>
+    <b class="ltr"></b>
+  </div>`;
+}
+
+/**
+ * Repaints the countdown in place, once a second, without re-rendering the
+ * section -- the same reason the aircraft marker moves this way.
+ */
+export function tickCountdown(model, timeline, scope = document) {
+  const node = scope.querySelector('[data-countdown]');
+  if (!node) return;
+
+  const target = Number(node.dataset.countdown);
+  const seconds = Math.round((target - Date.now()) / 1000);
+  const late = seconds < 0;
+
+  node.querySelector('.k').textContent = late ? t('ov.pastEtot') : t('ov.toTakeoff');
+  node.querySelector('b').textContent = `${late ? '−' : ''}${clock(Math.abs(seconds))}`;
+  node.classList.toggle('late', late);
+  // Inside the last ten minutes it stops being background information.
+  node.classList.toggle('soon', !late && seconds <= 600);
+}
+
+/** h:mm:ss once there is an hour to show, m:ss below that. */
+function clock(seconds) {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = seconds % 60;
+  const pad = (n) => String(n).padStart(2, '0');
+  return h ? `${h}:${pad(m)}:${pad(s)}` : `${m}:${pad(s)}`;
 }
 
 /* ---------------------------------------------------------------- phases */

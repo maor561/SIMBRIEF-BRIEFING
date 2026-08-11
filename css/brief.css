@@ -1816,6 +1816,54 @@ table.fuelcheck-table .dim { color: var(--dimmer); }
   font-weight: 700;
 }
 
+/* ------------------------------------------------------------- countdown */
+
+/*
+ * Inside the arch, where the figures used to be. Centred on the box, which
+ * puts it below the cruise line and well clear of the aircraft riding it.
+ */
+.sched-countdown {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  direction: ltr;
+  pointer-events: none;
+}
+
+.sched-countdown .k {
+  display: block;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--dimmer);
+}
+
+.sched-countdown b {
+  display: block;
+  margin-block-start: 3px;
+  font-family: var(--mono);
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--dim);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The last ten minutes: no longer background information. */
+.sched-countdown.soon b { color: var(--blue); }
+.sched-countdown.soon .k { color: var(--blue); }
+
+/* Past the planned wheels-up and still on the ground. */
+.sched-countdown.late b { color: var(--amber); }
+.sched-countdown.late .k { color: var(--amber); }
+
+@media (max-width: 620px) {
+  .sched-countdown b { font-size: 21px; }
+}
+
 /* ------------------------------------------------------- turnaround phases */
 
 .phase-chain {
