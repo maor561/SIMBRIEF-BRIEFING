@@ -28,6 +28,18 @@ import {
 } from '../js/decode.js';
 import { runwayWind } from '../js/wind.js';
 import { notamKey, isRead, markRead, markUnread, unreadCount } from '../js/notamlog.js';
+import {
+  getTimeline,
+  startPhase,
+  completePhase,
+  reopenPhase,
+  phaseState,
+  rebasedTimes,
+  fixEta,
+  currentLeg,
+  fuelCheckpoints,
+  dueCheckpoint
+} from '../js/timeline.js';
 
 const fixturePath = fileURLToPath(new URL('./fixture.json', import.meta.url));
 const raw = JSON.parse(readFileSync(fixturePath, 'utf8'));
@@ -498,6 +510,134 @@ check('says nothing about a wind with no direction', () => {
     runwayWind(runway, parseMetar('LEBL 101630Z VRB04KT 9999 20/10 Q1015')).variable,
     true
   );
+});
+
+/* -------------------------------------------------------------- timeline */
+
+/** localStorage stand-in, so the stores under test have somewhere to write. */
+function withStorage(run) {
+  const data = {};
+  globalThis.localStorage = {
+    getItem: (k) => data[k] ?? null,
+    setItem: (k, v) => {
+      data[k] = v;
+    },
+    removeItem: (k) => {
+      delete data[k];
+    }
+  };
+  try {
+    run();
+  } finally {
+    delete globalThis.localStorage;
+  }
+}
+
+check('walks the turnaround forward one phase at a time', () => {
+  withStorage(() => {
+    assert.equal(phaseState(getTimeline(model), 'fuelling'), 'pending');
+
+    startPhase(model, 'fuelling', 1000);
+    assert.equal(phaseState(getTimeline(model), 'fuelling'), 'running');
+
+    // Closing one opens the next, so the chain does not need driving twice.
+    const after = completePhase(model, 'fuelling', 2000);
+    assert.equal(phaseState(after, 'fuelling'), 'done');
+    assert.equal(phaseState(after, 'catering'), 'running');
+    assert.equal(after.current, 'catering');
+
+    // And a mis-tap can be taken back, along with the phase it opened.
+    const reopened = reopenPhase(model, 'fuelling');
+    assert.equal(phaseState(reopened, 'fuelling'), 'running');
+    assert.equal(phaseState(reopened, 'catering'), 'pending');
+  });
+});
+
+check('rebases the whole clock off the real wheels-up', () => {
+  withStorage(() => {
+    const before = rebasedTimes(model, getTimeline(model));
+    assert.equal(before.started, false, 'nothing is rebased until takeoff is marked');
+
+    // Airborne at exactly 19:00Z on the plan's own day.
+    const off = Date.UTC(2026, 2, 11, 19, 0, 0);
+    completePhase(model, 'takeoff', off);
+    const clock = rebasedTimes(model, getTimeline(model));
+
+    assert.equal(clock.started, true);
+    assert.equal(clock.actual.off.getTime(), off);
+
+    // Landing is takeoff plus the plan's enroute time; on-blocks adds taxi in.
+    assert.equal(
+      clock.actual.on.getTime(),
+      off + model.times.estTimeEnroute * 1000,
+      'landing follows from the plan, not from the schedule it missed'
+    );
+    assert.equal(clock.actual.in.getTime(), clock.actual.on.getTime() + model.times.taxiIn * 1000);
+
+    // The plan said 18:30Z, so this is half an hour late.
+    assert.equal(clock.delaySeconds, 1800);
+    assert.equal(clock.planned.off.getTime(), model.times.estOff.getTime(), 'the plan is kept');
+
+    // Every fix moves with it.
+    const fix = model.navlog.find((f) => f.timeTotal > 0);
+    assert.equal(fixEta(model, getTimeline(model), fix).getTime(), off + fix.timeTotal * 1000);
+
+    // An hour in, the aircraft is between the fixes either side of that hour.
+    const leg = currentLeg(model, getTimeline(model), off + 3600 * 1000);
+    assert.equal(leg.passed.timeTotal <= 3600, true);
+    assert.equal(leg.next.timeTotal > 3600, true);
+  });
+});
+
+check('asks for fuel at the points that carry information', () => {
+  const points = fuelCheckpoints(model);
+  const whys = points.map((p) => p.why);
+
+  assert.equal(whys[0], 'toc', 'the climb burn is only known at the top of it');
+  assert.equal(whys.at(-1), 'destination');
+  assert.equal(whys.includes('tod'), true);
+  assert.equal(points.length < 8, true, `${points.length} prompts is too many to read`);
+
+  // Strictly ordered, and never the same fix twice.
+  const times = points.map((p) => p.fix.timeTotal);
+  assert.deepEqual(times, [...times].sort((a, b) => a - b));
+  assert.equal(new Set(points.map((p) => p.fix.index)).size, points.length);
+
+  // No cruise check crowding the top of descent.
+  const tod = points.find((p) => p.why === 'tod');
+  const crowding = points.filter(
+    (p) => p.why === 'cruise' && tod.fix.timeTotal - p.fix.timeTotal < 20 * 60
+  );
+  assert.deepEqual(crowding, []);
+});
+
+check('only asks about a checkpoint the flight has actually reached', () => {
+  withStorage(() => {
+    const points = fuelCheckpoints(model);
+    const first = points[0];
+
+    assert.equal(dueCheckpoint(model, getTimeline(model), {}), null, 'nothing due before takeoff');
+
+    const off = Date.UTC(2026, 2, 11, 19, 0, 0);
+    completePhase(model, 'takeoff', off);
+    const timeline = getTimeline(model);
+
+    // A minute before the first checkpoint, nothing is owed yet.
+    assert.equal(dueCheckpoint(model, timeline, {}, off + (first.fix.timeTotal - 60) * 1000), null);
+
+    // A minute after, it is.
+    const due = dueCheckpoint(model, timeline, {}, off + (first.fix.timeTotal + 60) * 1000);
+    assert.equal(due.fix.index, first.fix.index);
+
+    // Answered, it stops being asked -- and the next one is not yet due.
+    const answered = dueCheckpoint(
+      model,
+      timeline,
+      { [first.fix.index]: 11400 },
+      off + (first.fix.timeTotal + 60) * 1000
+    );
+    assert.equal(answered, null);
+  });
 });
 
 /* -------------------------------------------------------- NOTAM read state */

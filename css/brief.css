@@ -1207,6 +1207,243 @@ table.fuelcheck-table .dim { color: var(--dimmer); }
   color: var(--text);
 }
 
+/*
+ * Once a milestone has a real time, the planned one steps back to become the
+ * reference and the actual takes the emphasis.
+ */
+.sched-mark.has-actual b {
+  font-size: 11px;
+  color: var(--dimmer);
+  text-decoration: line-through;
+  text-decoration-color: var(--line-solid);
+}
+
+.sched-mark u {
+  display: block;
+  margin-block-start: 1px;
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--blue);
+  text-decoration: none;
+}
+
+/* ------------------------------------------------------------ fuel prompt */
+
+/*
+ * Sits over the briefing rather than replacing it: the crew should be able to
+ * read the screen behind while answering, and dismissing is one tap away.
+ * Anchored bottom-inline-end so it stays clear of the rail and, on a tablet
+ * held in two hands, lands near a thumb.
+ */
+.prompt {
+  position: fixed;
+  inset-block-end: 18px;
+  inset-inline-end: 18px;
+  z-index: 40;
+  max-width: min(360px, calc(100vw - 36px));
+}
+
+.prompt-card {
+  padding: 13px 15px 14px;
+  border: 1px solid var(--blue);
+  border-radius: var(--radius);
+  background: var(--panel);
+  box-shadow: 0 12px 32px rgb(0 0 0 / 0.45);
+}
+
+.prompt-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.prompt-why {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--blue);
+}
+
+.prompt-head b {
+  font-family: var(--mono);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.prompt-plan {
+  margin-block-start: 3px;
+  font-size: 11px;
+  color: var(--dimmer);
+}
+
+.prompt-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-block-start: 10px;
+}
+
+.prompt-row .fuel-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.prompt-row .phase-btn {
+  align-self: auto;
+  flex: none;
+  padding: 7px 11px;
+}
+
+/* -------------------------------------------------- fuel check, in flight */
+
+/* Behind the aircraft: still readable, no longer the thing to act on. */
+.fuelcheck-table tr.passed td {
+  opacity: 0.5;
+}
+
+/* The fix being flown towards. */
+.fuelcheck-table tr.current td {
+  background: var(--blue-bg);
+}
+
+.fuelcheck-table td.eto-next {
+  color: var(--blue);
+  font-weight: 700;
+}
+
+/* A point where a reading is wanted, marked so the row can be found while
+   scrolling rather than read for. */
+.fuel-due {
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  margin-inline-start: 6px;
+  border-radius: 50%;
+  background: var(--amber);
+  vertical-align: middle;
+}
+
+.fuelcheck-table tr.checkpoint td:first-child {
+  font-weight: 700;
+}
+
+/* ------------------------------------------------------- turnaround phases */
+
+.phase-chain {
+  margin-block-start: 4px;
+  padding-block-start: 13px;
+  border-block-start: 1px solid var(--line-solid);
+}
+
+.phases {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(112px, 1fr));
+  gap: 8px;
+}
+
+/*
+ * One tile per phase, reading left to right as the turnaround runs. State is
+ * carried by the border and the figure's colour rather than by an icon, so a
+ * glance down the row shows how far along things are.
+ */
+.phase {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 9px 10px 8px;
+  border: 1px solid var(--line-solid);
+  border-radius: var(--radius-sm);
+  background: var(--panel-2);
+}
+
+.phase i {
+  font-style: normal;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--dimmer);
+}
+
+.phase b {
+  font-family: var(--mono);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1;
+}
+
+.phase b.est {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--dimmer);
+}
+
+.phase.done {
+  border-color: color-mix(in srgb, var(--green) 45%, var(--line-solid));
+}
+
+.phase.done b { color: var(--green); }
+
+/* The phase actually happening: lit, so the eye lands on it first. */
+.phase.running {
+  border-color: var(--blue);
+  background: var(--blue-bg);
+}
+
+.phase.running b { color: var(--blue); }
+
+/* Running long enough to be worth noticing. */
+.phase.over b { color: var(--amber); }
+
+.phase-btn {
+  align-self: stretch;
+  padding: 5px 0;
+  border-radius: 4px;
+  border: 1px solid var(--line-solid);
+  background: transparent;
+  color: var(--dim);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.phase-btn.go {
+  border-color: var(--blue);
+  background: var(--blue);
+  color: var(--bg);
+}
+
+.phase-btn.undo {
+  border-color: transparent;
+  color: var(--dimmer);
+  font-size: 9px;
+}
+
+.phase-hint {
+  margin-block-start: 10px;
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--dimmer);
+}
+
+.phase-reset {
+  margin-block-start: 10px;
+  padding: 4px 9px;
+  border-radius: 4px;
+  border: 1px solid var(--line-solid);
+  background: transparent;
+  color: var(--dimmer);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
 /* map */
 
 .cover-map { border-block-end: 1px solid var(--line-solid); }

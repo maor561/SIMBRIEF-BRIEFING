@@ -15,11 +15,23 @@ import { escapeHtml, fmtNumber, fmtDuration, fmtZulu } from '../decode.js';
 import { icon, section, findingsList } from '../ui.js';
 import { dominantCruiseAltitude } from '../charts.js';
 import { SEVERITY } from '../analyze.js';
+import {
+  PHASES,
+  PHASE_KEYS,
+  phaseState,
+  phaseElapsed,
+  rebasedTimes
+} from '../timeline.js';
 
-export default function renderOverview({ model, findings }) {
+export default function renderOverview({ model, findings, timeline }) {
   const critical = findings.filter((f) => f.severity === SEVERITY.CRITICAL).length;
+  const clock = rebasedTimes(model, timeline);
 
-  const watch = findings.length
+  // Once the flight is running, how it is running against the plan outranks
+  // the findings count in the header -- it is the thing that changes.
+  const watch = clock.started
+    ? delayFlag(clock)
+    : findings.length
     ? `<span class="sect-flag ${critical ? 'bad' : 'warn'}">
          ${icon('obstacle', { size: 14 })}${findings.length} ${escapeHtml(t('sum.watchItems'))}
        </span>`
@@ -27,7 +39,7 @@ export default function renderOverview({ model, findings }) {
 
   return `
     <div class="cover">
-      ${section(t('ov.schedule'), 'clock', scheduleBand(model), { action: watch })}
+      ${section(t('ov.schedule'), 'clock', scheduleBand(model, timeline), { action: watch })}
       ${section(t('ov.dispatch'), 'headset', dispatchBody(model))}
       ${section(t('common.route'), 'routeSwap', routeBody(model))}
       ${
@@ -47,6 +59,31 @@ export default function renderOverview({ model, findings }) {
       }
     </div>
   `;
+}
+
+/**
+ * On time, late, or early, against the planned wheels-up. Five minutes either
+ * way is not a delay worth a colour.
+ *
+ * Beyond half a day the two times are not the same day's flight -- an OFP
+ * flown the following evening would read as a twenty-hour delay -- so the
+ * comparison is dropped rather than reported as a number nobody would believe.
+ */
+function delayFlag(clock) {
+  const seconds = clock.delaySeconds;
+  const comparable = Number.isFinite(seconds) && Math.abs(seconds) < 12 * 3600;
+
+  if (!comparable) {
+    return `<span class="sect-flag good">${escapeHtml(t('phase.airborne'))}</span>`;
+  }
+  if (Math.abs(seconds) < 300) {
+    return `<span class="sect-flag good">${escapeHtml(t('phase.onTime'))}</span>`;
+  }
+
+  const late = seconds > 0;
+  return `<span class="sect-flag ${late ? 'warn' : ''}">
+    ${escapeHtml(late ? t('phase.late') : t('phase.early'))} <span class="ltr">${fmtDuration(Math.abs(seconds))}</span>
+  </span>`;
 }
 
 /* ------------------------------------------------------------- schedule */
@@ -72,8 +109,9 @@ const pct = (value, total) => `${((value / total) * 100).toFixed(2)}%`;
  * they sit on the curve at the point of the flight they belong to rather than
  * in a table somewhere below.
  */
-function scheduleBand(model) {
+function scheduleBand(model, timeline) {
   const times = model.times;
+  const clock = rebasedTimes(model, timeline);
   const cruiseAlt = dominantCruiseAltitude(model) || model.flight.initialAltitude;
   const units = model.units === 'lbs' ? 'lb' : 'kg';
 
@@ -108,13 +146,26 @@ function scheduleBand(model) {
     .map((m) => `<span class="sched-dot" style="--x:${pct(m.x, VB_W)};--y:${pct(GROUND_Y, VB_H)}"></span>`)
     .join('');
 
+  // Once the flight is running each milestone carries its real time under the
+  // planned one. The planned figure stays: on its own the actual says when,
+  // but the pair says how late.
+  const actualFor = (key) => {
+    if (!clock.started) return null;
+    if (key === 'etot') return clock.actual.off;
+    if (key === 'eta') return clock.actual.on;
+    if (key === 'sta') return clock.actual.in;
+    return null;
+  };
+
   const labels = marks
-    .map(
-      (m) => `<span class="sched-mark" style="--x:${pct(m.x, VB_W)}">
+    .map((m) => {
+      const actual = actualFor(m.key);
+      return `<span class="sched-mark${actual ? ' has-actual' : ''}" style="--x:${pct(m.x, VB_W)}">
         <i>${escapeHtml(t(`ov.${m.key}`))}</i>
         <b class="ltr">${escapeHtml(fmtZulu(m.time))}</b>
-      </span>`
-    )
+        ${actual ? `<u class="ltr">${escapeHtml(fmtZulu(actual))}</u>` : ''}
+      </span>`;
+    })
     .join('');
 
   const path =
@@ -149,7 +200,76 @@ function scheduleBand(model) {
     </div>
 
     <div class="sched-marks">${labels}</div>
+    ${phaseChain(model, timeline)}
   </div>`;
+}
+
+/* ---------------------------------------------------------------- phases */
+
+/**
+ * The turnaround as a chain of timed phases.
+ *
+ * Each one is closed by hand, because only the crew knows when fuelling is
+ * actually finished. Closing the takeoff phase is the moment the whole
+ * briefing stops being a prediction: from there every time on every screen is
+ * recomputed off the real wheels-up.
+ */
+function phaseChain(model, timeline) {
+  const now = Date.now();
+  const anythingStarted = PHASE_KEYS.some((key) => phaseState(timeline, key) !== 'pending');
+
+  const chips = PHASES.map((phase) => {
+    const state = phaseState(timeline, phase.key);
+    const elapsed = phaseElapsed(timeline, phase.key, now);
+    const expected = expectedSeconds(model, phase);
+
+    // A running phase shows its own clock; a finished one what it took; a
+    // pending one what it is expected to take, so the chain reads forward.
+    const figure =
+      state === 'pending'
+        ? expected
+          ? `<b class="est ltr">${fmtDuration(expected)}</b>`
+          : '<b class="est">—</b>'
+        : `<b class="ltr" data-phase-clock="${phase.key}">${fmtDuration(elapsed)}</b>`;
+
+    const over = state !== 'pending' && expected && elapsed > expected * 1.25;
+
+    return `<div class="phase ${state}${over ? ' over' : ''}">
+      <i>${escapeHtml(t(phase.labelKey))}</i>
+      ${figure}
+      ${phaseButton(phase, state)}
+    </div>`;
+  }).join('');
+
+  return `<div class="phase-chain">
+    <div class="phases">${chips}</div>
+    ${
+      anythingStarted
+        ? `<button class="phase-reset" data-action="timeline-reset">${escapeHtml(t('phase.reset'))}</button>`
+        : `<div class="phase-hint">${escapeHtml(t('phase.hint'))}</div>`
+    }
+  </div>`;
+}
+
+/**
+ * How long a phase should take. Ground handling carries a default; the two
+ * flight phases take their length from the plan, which knows better than any
+ * constant could.
+ */
+function expectedSeconds(model, phase) {
+  if (phase.key === 'takeoff') return model.times.taxiOut || null;
+  if (phase.key === 'landing') return model.times.estTimeEnroute || null;
+  return phase.duration || null;
+}
+
+function phaseButton(phase, state) {
+  if (state === 'done') {
+    return `<button class="phase-btn undo" data-action="phase-reopen" data-phase="${phase.key}" title="${escapeHtml(t('phase.undo'))}" aria-label="${escapeHtml(t('phase.undo'))}">${escapeHtml(t('phase.undoShort'))}</button>`;
+  }
+  if (state === 'running') {
+    return `<button class="phase-btn go" data-action="phase-done" data-phase="${phase.key}">${escapeHtml(t(`phase.end.${phase.key}`))}</button>`;
+  }
+  return `<button class="phase-btn" data-action="phase-start" data-phase="${phase.key}">${escapeHtml(t('phase.start'))}</button>`;
 }
 
 /**

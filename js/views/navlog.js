@@ -7,19 +7,21 @@
  */
 
 import { t } from '../i18n.js';
-import { escapeHtml, fmtNumber, fmtWeight, fmtDuration } from '../decode.js';
+import { escapeHtml, fmtNumber, fmtWeight, fmtDuration, fmtZulu } from '../decode.js';
 import { section, chip, icon } from '../ui.js';
 import { stepLadder, cruiseFactsBody } from '../charts.js';
 import { getActuals, summarise, classify } from '../fuellog.js';
+import { currentLeg, fixEta, fuelCheckpoints } from '../timeline.js';
 
-export default function renderNavlog({ model }) {
+export default function renderNavlog({ model, timeline }) {
   const actuals = getActuals(model);
+  const leg = currentLeg(model, timeline);
 
   return `
     <div class="cover">
       ${section(t('crz.title'), 'wind', cruiseFactsBody(model), { action: etopsFlag(model) })}
       ${section(t('crz.stepClimb'), 'aircraft', stepLadder(model))}
-      ${section(t('nl.fuelCheck'), 'clock', fuelCheckBody(model, actuals), {
+      ${section(t('nl.fuelCheck'), 'clock', fuelCheckBody(model, actuals, timeline, leg), {
         action: `<span data-fuel-flag>${summaryFlag(model, actuals)}</span>
                  <button class="notam-btn" data-action="clear-fuel-log" title="${escapeHtml(t('fuel.clearLog'))}" aria-label="${escapeHtml(t('fuel.clearLog'))}">${icon('obstacle', { size: 16 })}</button>`
       })}
@@ -66,11 +68,12 @@ function signedWeight(value, units) {
   return `${sign}${fmtWeight(Math.abs(value), units)}`;
 }
 
-function fuelCheckBody(model, actuals) {
+function fuelCheckBody(model, actuals, timeline, leg) {
   const fixes = model.navlog.filter((f) => Number.isFinite(f.fuelOnBoard));
   if (!fixes.length) return `<div class="empty-state">${escapeHtml(t('common.notAvailable'))}</div>`;
 
   const unit = model.units === 'lbs' ? 'lb' : 'kg';
+  const due = new Set(fuelCheckpoints(model).map((c) => c.fix.index));
 
   return `
     <div class="atc-note">
@@ -84,23 +87,39 @@ function fuelCheckBody(model, actuals) {
       <thead><tr>
         <th>${escapeHtml(t('nl.ident'))}</th>
         <th>${escapeHtml(t('common.time'))}</th>
+        <th>${escapeHtml(t('phase.eto'))}</th>
         <th>${escapeHtml(t('nl.planned'))} (${unit})</th>
         <th>${escapeHtml(t('nl.minimum'))} (${unit})</th>
         <th>${escapeHtml(t('nl.actual'))} (${unit})</th>
         <th>${escapeHtml(t('nl.diff'))}</th>
       </tr></thead>
-      <tbody>${fixes.map((fix) => fuelRow(model, fix, actuals)).join('')}</tbody>
+      <tbody>${fixes
+        .map((fix) => fuelRow(model, fix, actuals, timeline, leg, due.has(fix.index)))
+        .join('')}</tbody>
     </table></div>
   `;
 }
 
-function fuelRow(model, fix, actuals) {
+function fuelRow(model, fix, actuals, timeline, leg, isCheckpoint) {
   const actual = actuals[fix.index];
   const { state, diff } = classify(fix, actual, model.fuel.contingency);
+  const eta = fixEta(model, timeline, fix);
 
-  return `<tr>
-    <td><b>${escapeHtml(fix.ident)}</b></td>
+  // Where the aircraft is now, and which rows are the ones to fill in.
+  const passed = leg?.passed && fix.timeTotal <= leg.passed.timeTotal;
+  const isNext = leg?.next && fix.index === leg.next.index;
+  const cls = [
+    passed ? 'passed' : '',
+    isNext ? 'current' : '',
+    isCheckpoint ? 'checkpoint' : ''
+  ]
+    .filter(Boolean)
+    .join(' ');
+
+  return `<tr class="${cls}">
+    <td><b>${escapeHtml(fix.ident)}</b>${isCheckpoint ? '<span class="fuel-due"></span>' : ''}</td>
     <td>${Number.isFinite(fix.timeTotal) ? fmtDuration(fix.timeTotal) : '—'}</td>
+    <td class="${isNext ? 'eto-next' : 'dim'}">${eta ? escapeHtml(fmtZulu(eta)) : '—'}</td>
     <td>${fmtNumber(fix.fuelOnBoard)}</td>
     <td class="dim">${Number.isFinite(fix.fuelMinOnBoard) ? fmtNumber(fix.fuelMinOnBoard) : '—'}</td>
     <td>

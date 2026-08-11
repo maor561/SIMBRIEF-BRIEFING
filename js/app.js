@@ -6,7 +6,7 @@
 import { t } from './i18n.js';
 import { normalizeOfp } from './normalize.js';
 import { analyze, countByChapter, SEVERITY } from './analyze.js';
-import { escapeHtml, fmtZulu, fmtDuration } from './decode.js';
+import { escapeHtml, fmtZulu, fmtDuration, fmtNumber } from './decode.js';
 import { getNotamFilter, notamControls, notamListMarkup } from './ui.js';
 import { layoutMasonry } from './masonry.js';
 
@@ -18,8 +18,17 @@ import renderPerformance from './views/performance.js';
 import renderNavlog, { diffCell, summaryPanel, summaryFlag } from './views/navlog.js';
 import renderAtc from './views/atc.js';
 import { buildFixDetail } from './charts.js';
-import { setActual, classify, clearActuals } from './fuellog.js';
+import { setActual, classify, clearActuals, getActuals } from './fuellog.js';
 import { markRead, markUnread } from './notamlog.js';
+import {
+  getTimeline,
+  startPhase,
+  completePhase,
+  reopenPhase,
+  resetTimeline,
+  phaseElapsed,
+  dueCheckpoint
+} from './timeline.js';
 
 const STORAGE_USER = 'sbb.username';
 
@@ -61,7 +70,9 @@ const state = {
   vatsim: null,
   // Live METAR from VATSIM, keyed by ICAO. The OFP snapshot stays the
   // baseline so the screen still works with no network.
-  liveMetar: null
+  liveMetar: null,
+  // Turnaround phases and the real wheels-up time, once the crew marks it.
+  timeline: { phases: {}, current: null }
 };
 
 const el = {
@@ -103,6 +114,7 @@ async function load({ username, demo = false } = {}) {
     state.raw = raw;
     state.model = normalizeOfp(raw);
     state.findings = analyze(state.model);
+    state.timeline = getTimeline(state.model);
     state.demo = demo;
 
     if (!demo && username) {
@@ -196,7 +208,8 @@ function renderChapter({ preserveScroll = false } = {}) {
     model: state.model,
     findings: state.findings,
     vatsim: state.vatsim,
-    liveMetar: state.liveMetar
+    liveMetar: state.liveMetar,
+    timeline: state.timeline
   });
   if (chapter.id === 'atc') ensureVatsim();
   // Performance wants it too: the live wind is what its takeoff figures get
@@ -454,6 +467,51 @@ document.addEventListener('click', (event) => {
       break;
     }
 
+    // Driving the turnaround. Completing the takeoff phase re-anchors every
+    // time in the briefing, so the whole chapter is rebuilt rather than
+    // patched -- the navlog, the fuel checks and the schedule all move.
+    case 'phase-start':
+      state.timeline = startPhase(state.model, trigger.dataset.phase);
+      renderChapter({ preserveScroll: true });
+      break;
+
+    case 'phase-done':
+      state.timeline = completePhase(state.model, trigger.dataset.phase);
+      renderChapter({ preserveScroll: true });
+      break;
+
+    case 'phase-reopen':
+      state.timeline = reopenPhase(state.model, trigger.dataset.phase);
+      renderChapter({ preserveScroll: true });
+      break;
+
+    case 'timeline-reset':
+      state.timeline = resetTimeline(state.model);
+      renderChapter({ preserveScroll: true });
+      break;
+
+    // The prompt writes into the same fuel log the navlog table does, so a
+    // reading taken here shows up there and on the fuel curve.
+    case 'prompt-save': {
+      const input = document.querySelector('[data-action="prompt-fuel"]');
+      const index = Number(input?.dataset.fixIndex);
+      const digits = (input?.value || '').replace(/\D/g, '');
+      if (digits) setActual(state.model, index, digits);
+      dismissedPrompts.add(String(index));
+      updateFuelPrompt();
+      if (state.chapter === 'navlog' || state.chapter === 'fuel') {
+        renderChapter({ preserveScroll: true });
+      }
+      break;
+    }
+
+    case 'prompt-skip': {
+      const node = document.getElementById('fuel-prompt');
+      if (node?.dataset.fixIndex) dismissedPrompts.add(node.dataset.fixIndex);
+      updateFuelPrompt();
+      break;
+    }
+
     case 'clear-fuel-log':
       clearActuals(state.model);
       renderChapter({ preserveScroll: true });
@@ -604,6 +662,83 @@ setInterval(() => {
   const clock = document.getElementById('clock');
   if (clock) clock.textContent = fmtZulu(new Date());
 }, 10000);
+
+/*
+ * A running phase's timer is patched in place every second rather than
+ * re-rendering the chapter: a full render would rebuild the DOM under the
+ * crew's finger once a second, and the only thing that changed is a duration.
+ */
+setInterval(() => {
+  if (!state.model || document.hidden) return;
+  for (const node of document.querySelectorAll('[data-phase-clock]')) {
+    const seconds = phaseElapsed(state.timeline, node.dataset.phaseClock);
+    if (seconds !== null) node.textContent = fmtDuration(seconds);
+  }
+}, 1000);
+
+/* ---------------------------------------------------------- fuel prompt */
+
+/**
+ * Asks for the fuel on board when a logging point comes due.
+ *
+ * The points come from the plan (top of climb, each hour of cruise, top of
+ * descent, destination) but the moment comes from the real clock, which only
+ * exists once takeoff has been stamped. Dismissing one puts it aside for this
+ * session rather than for good -- a reading skipped in a busy descent is
+ * still worth having ten minutes later.
+ */
+const dismissedPrompts = new Set();
+
+function updateFuelPrompt() {
+  const node = document.getElementById('fuel-prompt');
+  if (!node || !state.model) return;
+
+  const due = dueCheckpoint(state.model, state.timeline, getActuals(state.model));
+  const key = due ? String(due.fix.index) : null;
+
+  if (!due || dismissedPrompts.has(key)) {
+    if (!node.hidden) {
+      node.hidden = true;
+      node.innerHTML = '';
+    }
+    return;
+  }
+
+  // Already showing this one: leave it alone so it does not steal the caret
+  // out from under a half-typed figure.
+  if (node.dataset.fixIndex === key) return;
+
+  node.dataset.fixIndex = key;
+  node.hidden = false;
+  node.innerHTML = fuelPromptMarkup(state.model, due);
+  node.querySelector('input')?.focus();
+}
+
+function fuelPromptMarkup(model, due) {
+  const { fix, why } = due;
+  const unit = model.units === 'lbs' ? 'lb' : 'kg';
+
+  return `<div class="prompt-card" role="dialog" aria-label="${escapeHtml(t('nl.fuelCheck'))}">
+    <div class="prompt-head">
+      <span class="prompt-why">${escapeHtml(t(`nl.due.${why}`))}</span>
+      <b class="ltr">${escapeHtml(fix.ident)}</b>
+    </div>
+    <div class="prompt-plan">
+      ${escapeHtml(t('nl.planned'))} <span class="ltr">${fmtNumber(fix.fuelOnBoard)} ${unit}</span>
+    </div>
+    <div class="prompt-row">
+      <input class="fuel-input" type="text" inputmode="numeric" pattern="[0-9]*"
+             enterkeyhint="done" autocomplete="off" maxlength="6"
+             data-action="prompt-fuel" data-fix-index="${fix.index}"
+             placeholder="${escapeHtml(t('nl.actual'))}"
+             aria-label="${escapeHtml(`${t('nl.actual')} ${fix.ident}`)}">
+      <button class="phase-btn go" data-action="prompt-save">${escapeHtml(t('nl.log'))}</button>
+      <button class="phase-btn" data-action="prompt-skip">${escapeHtml(t('nl.later'))}</button>
+    </div>
+  </div>`;
+}
+
+setInterval(updateFuelPrompt, 5000);
 
 // Rotating the iPad (or resizing a dev window) can cross the two-column
 // threshold; re-run the full chapter render so masonry rebalances from a
