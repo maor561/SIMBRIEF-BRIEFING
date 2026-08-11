@@ -21,27 +21,24 @@
 const STORE_KEY = 'sbb.timeline';
 
 /**
- * The two spans that carry a real anchor into the OFP's clock.
+ * The two moments that carry a real anchor into the OFP's clock.
+ *
+ * Each is a single stamp, not a span with a start and an end. Wheels-up is an
+ * instant, and asking a crew to open a timer before it and close it after
+ * puts a step between pressing takeoff and the times updating -- which is the
+ * only thing pressing it is for.
  *
  * Nothing else is tracked. Ground handling has no bearing on any figure in
- * the briefing -- knowing how long boarding took changes no fuel number and
- * no waypoint time -- so timing it would be bookkeeping for its own sake.
- * These two do: one stamps wheels-up, which the whole clock is rebuilt from,
- * and one stamps touchdown.
+ * the briefing: knowing how long boarding took changes no fuel number and no
+ * waypoint time.
  */
 export const PHASES = [
-  // Runs from the moment the crew starts it until wheels leave the ground.
+  // Stamping this rebuilds the entire clock.
   { key: 'takeoff', labelKey: 'phase.takeoff', anchor: 'off' },
-  // Opens automatically at wheels-up and runs the flight; closing it stamps
-  // touchdown.
   { key: 'landing', labelKey: 'phase.landing', anchor: 'on' }
 ];
 
 export const PHASE_KEYS = PHASES.map((p) => p.key);
-
-function phaseAt(index) {
-  return PHASES[index] || null;
-}
 
 export function phaseFor(key) {
   return PHASES.find((p) => p.key === key) || null;
@@ -92,87 +89,76 @@ export function resetTimeline(model) {
 /* ---------------------------------------------------------------- driving */
 
 /**
- * Opens a phase's timer. Starting one closes nothing by itself -- a phase is
- * only ever finished deliberately, because "we are done fuelling" is a fact
- * about the aircraft, not about the clock.
+ * Records that a moment has just happened. One press, one stamp -- pressing
+ * takeoff is what rebases the clock, with nothing in between.
  */
-export function startPhase(model, key, at = Date.now()) {
+export function stampPhase(model, key, at = Date.now()) {
   if (!phaseFor(key)) return getTimeline(model);
-  const timeline = getTimeline(model);
-  const existing = timeline.phases[key];
-  if (existing?.startedAt) return timeline;
 
-  timeline.phases = { ...timeline.phases, [key]: { startedAt: at, endedAt: null } };
+  const timeline = getTimeline(model);
+  timeline.phases = { ...timeline.phases, [key]: { at } };
   timeline.current = key;
   return save(model, timeline);
 }
 
-/**
- * Closes a phase and opens the next one, so the chain walks itself forward.
- * A phase closed without ever being started is stamped at `at` for both, which
- * covers the honest case of remembering only once it is already over.
- */
-export function completePhase(model, key, at = Date.now()) {
-  const index = PHASE_KEYS.indexOf(key);
-  if (index < 0) return getTimeline(model);
-
-  const timeline = getTimeline(model);
-  const existing = timeline.phases[key] || {};
-  timeline.phases = {
-    ...timeline.phases,
-    [key]: { startedAt: existing.startedAt ?? at, endedAt: at }
-  };
-
-  const next = phaseAt(index + 1);
-  if (next && !timeline.phases[next.key]?.startedAt) {
-    timeline.phases[next.key] = { startedAt: at, endedAt: null };
-    timeline.current = next.key;
-  } else {
-    timeline.current = next ? next.key : null;
-  }
-
-  return save(model, timeline);
-}
-
-/** Undoes a completion, for the mis-tap. The next phase reverts with it. */
-export function reopenPhase(model, key) {
-  const index = PHASE_KEYS.indexOf(key);
-  if (index < 0) return getTimeline(model);
-
+/** Takes a stamp back, for the mis-tap. */
+export function clearPhase(model, key) {
   const timeline = getTimeline(model);
   if (!timeline.phases[key]) return timeline;
 
-  timeline.phases = { ...timeline.phases, [key]: { ...timeline.phases[key], endedAt: null } };
-  const next = phaseAt(index + 1);
-  if (next) delete timeline.phases[next.key];
-  timeline.current = key;
+  timeline.phases = { ...timeline.phases };
+  delete timeline.phases[key];
+
+  // Touchdown cannot stand without a takeoff to have flown from.
+  if (key === 'takeoff') delete timeline.phases.landing;
+
+  timeline.current = PHASE_KEYS.filter((k) => timeline.phases[k]).pop() || null;
   return save(model, timeline);
 }
 
 /* ---------------------------------------------------------------- reading */
 
-export function phaseState(timeline, key) {
-  const entry = timeline.phases?.[key];
-  if (!entry?.startedAt) return 'pending';
-  return entry.endedAt ? 'done' : 'running';
+/**
+ * The instant a phase was stamped at.
+ *
+ * Also reads the older shape, where each phase was a span with a start and an
+ * end: a timeline already in progress on a tablet should survive the change
+ * rather than losing the takeoff time it was built on.
+ */
+function stampOf(timeline, key) {
+  const entry = timeline?.phases?.[key];
+  if (!entry) return null;
+  const at = entry.at ?? entry.endedAt;
+  return Number.isFinite(at) ? at : null;
 }
 
+export function phaseState(timeline, key) {
+  return stampOf(timeline, key) === null ? 'pending' : 'done';
+}
+
+/**
+ * How long ago a moment was. For takeoff that is the time airborne, and it
+ * stops counting at touchdown -- after landing the useful figure is how long
+ * the flight took, not how long ago it ended.
+ */
 export function phaseElapsed(timeline, key, now = Date.now()) {
-  const entry = timeline.phases?.[key];
-  if (!entry?.startedAt) return null;
-  return Math.max(0, Math.round(((entry.endedAt ?? now) - entry.startedAt) / 1000));
+  const at = stampOf(timeline, key);
+  if (at === null) return null;
+
+  const until = key === 'takeoff' ? stampOf(timeline, 'landing') ?? now : now;
+  return Math.max(0, Math.round((until - at) / 1000));
 }
 
 /** When the aircraft actually left the ground, if the crew has said so. */
 export function actualOff(timeline) {
-  const entry = timeline.phases?.takeoff;
-  return entry?.endedAt ? new Date(entry.endedAt) : null;
+  const at = stampOf(timeline, 'takeoff');
+  return at === null ? null : new Date(at);
 }
 
 /** When it actually touched down. */
 export function actualOn(timeline) {
-  const entry = timeline.phases?.landing;
-  return entry?.endedAt ? new Date(entry.endedAt) : null;
+  const at = stampOf(timeline, 'landing');
+  return at === null ? null : new Date(at);
 }
 
 /**

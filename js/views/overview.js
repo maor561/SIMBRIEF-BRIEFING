@@ -216,65 +216,72 @@ function scheduleBand(model, timeline) {
  */
 function phaseChain(model, timeline) {
   const now = Date.now();
-  const anythingStarted = PHASE_KEYS.some((key) => phaseState(timeline, key) !== 'pending');
+  const clock = rebasedTimes(model, timeline);
+  const anyStamped = PHASE_KEYS.some((key) => phaseState(timeline, key) === 'done');
 
-  const chips = PHASES.map((phase) => {
+  const tiles = PHASES.map((phase) => {
     const state = phaseState(timeline, phase.key);
-    const elapsed = phaseElapsed(timeline, phase.key, now);
-    const expected = expectedSeconds(model, phase);
+    const stamped = phase.key === 'takeoff' ? clock.actual?.off : clock.actual?.on;
 
-    // A running phase shows its own clock; a finished one what it took; a
-    // pending one what it is expected to take, so the chain reads forward.
+    // The headline is the time itself. After the stamp that is the real one,
+    // which is the whole reason the button is pressed. Before it, the best
+    // estimate going -- for landing that means the projection off an already
+    // stamped takeoff, not the planned time the flight has stopped following.
+    const expected =
+      phase.key === 'takeoff'
+        ? clock.planned.off
+        : (clock.started ? clock.actual.on : null) || clock.planned.on;
+
     const figure =
-      state === 'pending'
-        ? expected
-          ? `<b class="est ltr">${fmtDuration(expected)}</b>`
-          : '<b class="est">—</b>'
-        : `<b class="ltr" data-phase-clock="${phase.key}">${fmtDuration(elapsed)}</b>`;
+      state === 'done' && stamped
+        ? `<b class="ltr">${escapeHtml(fmtZulu(stamped))}</b>`
+        : `<b class="est ltr">${expected ? escapeHtml(fmtZulu(expected)) : '—'}</b>`;
 
-    const over = state !== 'pending' && expected && elapsed > expected * 1.25;
-
-    return `<div class="phase ${state}${over ? ' over' : ''}">
+    return `<div class="phase ${state}">
       <div class="phase-head">
         <i>${escapeHtml(t(phase.labelKey))}</i>
-        ${state === 'done' ? phaseButton(phase, state) : ''}
+        ${
+          state === 'done'
+            ? `<button class="phase-btn undo" data-action="phase-clear" data-phase="${phase.key}" title="${escapeHtml(t('phase.undo'))}">${escapeHtml(t('phase.undoShort'))}</button>`
+            : ''
+        }
       </div>
       ${figure}
-      ${state === 'done' ? '' : phaseButton(phase, state)}
+      ${state === 'done' ? phaseNote(model, timeline, phase, now) : phaseButton(phase)}
     </div>`;
   }).join('');
 
   return `<div class="phase-chain">
-    <div class="phases">
-      ${chips}
-      ${
-        anythingStarted
-          ? `<button class="phase-reset" data-action="timeline-reset">${escapeHtml(t('phase.reset'))}</button>`
-          : ''
-      }
-    </div>
-    ${anythingStarted ? '' : `<div class="phase-hint">${escapeHtml(t('phase.hint'))}</div>`}
+    <div class="phases">${tiles}</div>
+    ${
+      anyStamped
+        ? `<button class="phase-reset" data-action="timeline-reset">${escapeHtml(t('phase.reset'))}</button>`
+        : `<div class="phase-hint">${escapeHtml(t('phase.hint'))}</div>`
+    }
   </div>`;
 }
 
-/**
- * How long a span should take, taken from the plan rather than a constant:
- * taxi out for the takeoff span, enroute time for the flight.
- */
-function expectedSeconds(model, phase) {
-  if (phase.key === 'takeoff') return model.times.taxiOut || null;
-  if (phase.key === 'landing') return model.times.estTimeEnroute || null;
-  return null;
+/** What the stamp bought: time airborne, or the flight's total once down. */
+function phaseNote(model, timeline, phase, now) {
+  const elapsed = phaseElapsed(timeline, phase.key, now);
+
+  if (phase.key === 'takeoff') {
+    const landed = phaseState(timeline, 'landing') === 'done';
+    return `<span class="phase-note">
+      ${escapeHtml(landed ? t('phase.flightTime') : t('phase.airborneFor'))}
+      <b class="ltr" data-phase-clock="takeoff">${fmtDuration(elapsed)}</b>
+    </span>`;
+  }
+
+  return `<span class="phase-note">${escapeHtml(t('phase.onBlocks'))}
+    <b class="ltr">${model.times.taxiIn ? fmtDuration(model.times.taxiIn) : '—'}</b>
+  </span>`;
 }
 
-function phaseButton(phase, state) {
-  if (state === 'done') {
-    return `<button class="phase-btn undo" data-action="phase-reopen" data-phase="${phase.key}" title="${escapeHtml(t('phase.undo'))}" aria-label="${escapeHtml(t('phase.undo'))}">${escapeHtml(t('phase.undoShort'))}</button>`;
-  }
-  if (state === 'running') {
-    return `<button class="phase-btn go" data-action="phase-done" data-phase="${phase.key}">${escapeHtml(t(`phase.end.${phase.key}`))}</button>`;
-  }
-  return `<button class="phase-btn" data-action="phase-start" data-phase="${phase.key}">${escapeHtml(t('phase.start'))}</button>`;
+function phaseButton(phase) {
+  return `<button class="phase-btn go" data-action="phase-stamp" data-phase="${phase.key}">
+    ${escapeHtml(t(`phase.end.${phase.key}`))}
+  </button>`;
 }
 
 /**

@@ -31,9 +31,10 @@ import { notamKey, isRead, markRead, markUnread, unreadCount } from '../js/notam
 import {
   PHASES,
   getTimeline,
-  startPhase,
-  completePhase,
-  reopenPhase,
+  stampPhase,
+  clearPhase,
+  actualOff,
+  phaseElapsed,
   phaseState,
   rebasedTimes,
   fixEta,
@@ -534,26 +535,34 @@ function withStorage(run) {
   }
 }
 
-check('tracks the two spans that anchor the clock, and nothing else', () => {
+check('stamps the two moments that anchor the clock, and nothing else', () => {
   assert.deepEqual(PHASES.map((p) => p.key), ['takeoff', 'landing']);
 
   withStorage(() => {
     assert.equal(phaseState(getTimeline(model), 'takeoff'), 'pending');
 
-    startPhase(model, 'takeoff', 1000);
-    assert.equal(phaseState(getTimeline(model), 'takeoff'), 'running');
-
-    // Wheels up opens the flight span, so it does not need starting by hand.
-    const after = completePhase(model, 'takeoff', 2000);
+    // One press is the whole interaction: the stamp lands immediately.
+    const after = stampPhase(model, 'takeoff', 2000);
     assert.equal(phaseState(after, 'takeoff'), 'done');
-    assert.equal(phaseState(after, 'landing'), 'running');
-    assert.equal(after.current, 'landing');
+    assert.equal(actualOff(after).getTime(), 2000);
 
-    // And a mis-tap can be taken back, along with the span it opened.
-    const reopened = reopenPhase(model, 'takeoff');
-    assert.equal(phaseState(reopened, 'takeoff'), 'running');
-    assert.equal(phaseState(reopened, 'landing'), 'pending');
+    // Time airborne runs from it, and stops at touchdown.
+    assert.equal(phaseElapsed(after, 'takeoff', 62000), 60);
+    const landed = stampPhase(model, 'landing', 3602000);
+    assert.equal(phaseElapsed(landed, 'takeoff', 9999999), 3600, 'frozen at the flight time');
+
+    // Clearing takeoff takes touchdown with it: it cannot stand alone.
+    const cleared = clearPhase(model, 'takeoff');
+    assert.equal(phaseState(cleared, 'takeoff'), 'pending');
+    assert.equal(phaseState(cleared, 'landing'), 'pending');
   });
+});
+
+check('keeps a timeline stamped under the older span shape', () => {
+  // A tablet mid-flight when the shape changed must not lose its takeoff.
+  const legacy = { phases: { takeoff: { startedAt: 1000, endedAt: 2000 } }, current: 'takeoff' };
+  assert.equal(phaseState(legacy, 'takeoff'), 'done');
+  assert.equal(actualOff(legacy).getTime(), 2000);
 });
 
 check('rebases the whole clock off the real wheels-up', () => {
@@ -563,7 +572,7 @@ check('rebases the whole clock off the real wheels-up', () => {
 
     // Airborne at exactly 19:00Z on the plan's own day.
     const off = Date.UTC(2026, 2, 11, 19, 0, 0);
-    completePhase(model, 'takeoff', off);
+    stampPhase(model, 'takeoff', off);
     const clock = rebasedTimes(model, getTimeline(model));
 
     assert.equal(clock.started, true);
@@ -631,7 +640,7 @@ check('only asks about a checkpoint the flight has actually reached', () => {
     assert.equal(dueCheckpoint(model, getTimeline(model), {}), null, 'nothing due before takeoff');
 
     const off = Date.UTC(2026, 2, 11, 19, 0, 0);
-    completePhase(model, 'takeoff', off);
+    stampPhase(model, 'takeoff', off);
     const timeline = getTimeline(model);
 
     // A minute before the first checkpoint, nothing is owed yet.

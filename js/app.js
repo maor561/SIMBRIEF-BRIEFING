@@ -22,9 +22,8 @@ import { setActual, classify, clearActuals, getActuals } from './fuellog.js';
 import { markRead, markUnread } from './notamlog.js';
 import {
   getTimeline,
-  startPhase,
-  completePhase,
-  reopenPhase,
+  stampPhase,
+  clearPhase,
   resetTimeline,
   phaseElapsed,
   dueCheckpoint,
@@ -468,26 +467,24 @@ document.addEventListener('click', (event) => {
       break;
     }
 
-    // Driving the turnaround. Completing the takeoff phase re-anchors every
-    // time in the briefing, so the whole chapter is rebuilt rather than
-    // patched -- the navlog, the fuel checks and the schedule all move.
-    case 'phase-start':
-      state.timeline = startPhase(state.model, trigger.dataset.phase);
+    // Stamping takeoff re-anchors every time in the briefing, so the whole
+    // chapter is rebuilt rather than patched -- the navlog, the fuel checks
+    // and the schedule all move with it.
+    case 'phase-stamp':
+      state.timeline = stampPhase(state.model, trigger.dataset.phase);
+      updateFuelPrompt();
       renderChapter({ preserveScroll: true });
       break;
 
-    case 'phase-done':
-      state.timeline = completePhase(state.model, trigger.dataset.phase);
-      renderChapter({ preserveScroll: true });
-      break;
-
-    case 'phase-reopen':
-      state.timeline = reopenPhase(state.model, trigger.dataset.phase);
+    case 'phase-clear':
+      state.timeline = clearPhase(state.model, trigger.dataset.phase);
+      updateFuelPrompt();
       renderChapter({ preserveScroll: true });
       break;
 
     case 'timeline-reset':
       state.timeline = resetTimeline(state.model);
+      updateFuelPrompt();
       renderChapter({ preserveScroll: true });
       break;
 
