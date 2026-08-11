@@ -614,6 +614,15 @@ check('asks for fuel at the points that carry information', () => {
   assert.deepEqual(crowding, []);
 });
 
+check('can be told to ask at every fix instead', () => {
+  const key = fuelCheckpoints(model, 'key');
+  const all = fuelCheckpoints(model, 'all');
+
+  assert.equal(all.length, model.navlog.filter((f) => Number.isFinite(f.fuelOnBoard)).length);
+  assert.equal(all.length > key.length, true);
+  assert.equal(all.every((c) => c.why === 'fix'), true);
+});
+
 check('only asks about a checkpoint the flight has actually reached', () => {
   withStorage(() => {
     const points = fuelCheckpoints(model);

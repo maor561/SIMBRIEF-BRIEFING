@@ -1353,6 +1353,15 @@ table.fuelcheck-table .dim { color: var(--dimmer); }
 .phases {
   display: flex;
   flex-wrap: wrap;
+  align-items: stretch;
+  gap: 8px;
+}
+
+/* Label on the left, the finished span's undo on the right. */
+.phase-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: 8px;
 }
 
@@ -1413,9 +1422,15 @@ table.fuelcheck-table .dim { color: var(--dimmer); }
 /* Running long enough to be worth noticing. */
 .phase.over b { color: var(--amber); }
 
+/*
+ * Only the live span carries a solid button. A pending one gets an outline
+ * and a finished one a bare word, so that at any moment exactly one control
+ * on the row looks pressable -- which is the one the crew wants.
+ */
 .phase-btn {
   align-self: stretch;
-  padding: 5px 0;
+  margin-block-start: 2px;
+  padding: 7px 0;
   border-radius: 4px;
   border: 1px solid var(--line-solid);
   background: transparent;
@@ -1430,12 +1445,21 @@ table.fuelcheck-table .dim { color: var(--dimmer); }
   border-color: var(--blue);
   background: var(--blue);
   color: var(--bg);
+  font-size: 11px;
 }
 
+/* Sits up beside the label, out of the way of the figure. */
 .phase-btn.undo {
-  border-color: transparent;
+  align-self: auto;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
   color: var(--dimmer);
   font-size: 9px;
+  letter-spacing: 0.05em;
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 .phase-hint {
@@ -1445,9 +1469,11 @@ table.fuelcheck-table .dim { color: var(--dimmer); }
   color: var(--dimmer);
 }
 
+/* Kept at arm's length from the two spans it would undo. */
 .phase-reset {
-  margin-block-start: 10px;
-  padding: 4px 9px;
+  align-self: center;
+  margin-inline-start: auto;
+  padding: 5px 10px;
   border-radius: 4px;
   border: 1px solid var(--line-solid);
   background: transparent;
@@ -1456,6 +1482,31 @@ table.fuelcheck-table .dim { color: var(--dimmer); }
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
+}
+
+/* --------------------------------------------------- segmented selector */
+
+.seg {
+  display: inline-flex;
+  border: 1px solid var(--line-solid);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.seg-btn {
+  padding: 5px 10px;
+  border: 0;
+  background: transparent;
+  color: var(--dimmer);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.seg-btn[aria-pressed='true'] {
+  background: var(--blue-bg);
+  color: var(--blue);
 }
 
 /* map */

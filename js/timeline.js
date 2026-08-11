@@ -224,18 +224,48 @@ export function fixEta(model, timeline, fix) {
   return off ? addSeconds(off instanceof Date ? off : new Date(off), fix.timeTotal) : null;
 }
 
+/* ------------------------------------------------------- prompt cadence */
+
+const MODE_KEY = 'sbb.fuelPromptMode';
+
+/** 'key' asks at the points that carry information; 'all' at every fix. */
+export function getPromptMode() {
+  try {
+    return globalThis.localStorage?.getItem(MODE_KEY) === 'all' ? 'all' : 'key';
+  } catch {
+    return 'key';
+  }
+}
+
+export function setPromptMode(mode) {
+  try {
+    globalThis.localStorage?.setItem(MODE_KEY, mode === 'all' ? 'all' : 'key');
+  } catch {
+    /* storage disabled; the choice lasts the session only */
+  }
+  return getPromptMode();
+}
+
 /**
  * The fixes worth stopping at to log the fuel on board.
  *
- * Not every waypoint: this flight has thirty-two, and a prompt at each one
- * becomes something to dismiss rather than something to read. The four that
- * carry information are the top of climb (where the climb burn is finally
- * known), each hour of cruise (where a trend shows), the top of descent
- * (the last point a diversion is cheap) and the destination.
+ * By default not every waypoint: this flight has thirty-two, and a prompt at
+ * each one becomes something to dismiss rather than something to read. The
+ * points that carry information are the top of climb (where the climb burn is
+ * finally known), each hour of cruise (where a trend shows), the top of
+ * descent (the last point a diversion is cheap) and the destination.
+ *
+ * A crew that wants the full log can have it: 'all' mode returns every fix.
  */
-export function fuelCheckpoints(model) {
+export function fuelCheckpoints(model, mode = getPromptMode()) {
   const fixes = model.navlog.filter((f) => Number.isFinite(f.timeTotal));
   if (!fixes.length) return [];
+
+  if (mode === 'all') {
+    return fixes
+      .filter((fix) => Number.isFinite(fix.fuelOnBoard))
+      .map((fix) => ({ fix, why: 'fix' }));
+  }
 
   const chosen = new Map();
   const take = (fix, why) => {
@@ -283,12 +313,12 @@ function nearestFix(fixes, seconds) {
  * prompt should be asking about. Null until takeoff is stamped, and null once
  * everything due has been answered.
  */
-export function dueCheckpoint(model, timeline, actuals, now = Date.now()) {
+export function dueCheckpoint(model, timeline, actuals, now = Date.now(), mode = getPromptMode()) {
   const off = actualOff(timeline);
   if (!off) return null;
 
   const elapsed = (now - off.getTime()) / 1000;
-  const reached = fuelCheckpoints(model).filter((c) => c.fix.timeTotal <= elapsed);
+  const reached = fuelCheckpoints(model, mode).filter((c) => c.fix.timeTotal <= elapsed);
 
   // Oldest unanswered first: falling behind should not skip the earlier one.
   return reached.find(({ fix }) => !Number.isFinite(actuals[fix.index])) || null;

@@ -188,6 +188,10 @@ const STRINGS = {
   'nl.due.cruise': 'Cruise check',
   'nl.due.tod': 'Top of descent',
   'nl.due.destination': 'Destination',
+  'nl.due.fix': 'Fuel check',
+  'nl.promptCadence': 'How often to prompt for fuel',
+  'nl.modeKey': 'Key points',
+  'nl.modeAll': 'Every fix',
 
   'notam.new': 'NEW',
   'notam.unread': 'UNREAD',

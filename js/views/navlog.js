@@ -11,7 +11,7 @@ import { escapeHtml, fmtNumber, fmtWeight, fmtDuration, fmtZulu } from '../decod
 import { section, chip, icon } from '../ui.js';
 import { stepLadder, cruiseFactsBody } from '../charts.js';
 import { getActuals, summarise, classify } from '../fuellog.js';
-import { currentLeg, fixEta, fuelCheckpoints } from '../timeline.js';
+import { currentLeg, fixEta, fuelCheckpoints, getPromptMode } from '../timeline.js';
 
 export default function renderNavlog({ model, timeline }) {
   const actuals = getActuals(model);
@@ -22,7 +22,8 @@ export default function renderNavlog({ model, timeline }) {
       ${section(t('crz.title'), 'wind', cruiseFactsBody(model), { action: etopsFlag(model) })}
       ${section(t('crz.stepClimb'), 'aircraft', stepLadder(model))}
       ${section(t('nl.fuelCheck'), 'clock', fuelCheckBody(model, actuals, timeline, leg), {
-        action: `<span data-fuel-flag>${summaryFlag(model, actuals)}</span>
+        action: `${promptModeToggle()}
+                 <span data-fuel-flag>${summaryFlag(model, actuals)}</span>
                  <button class="notam-btn" data-action="clear-fuel-log" title="${escapeHtml(t('fuel.clearLog'))}" aria-label="${escapeHtml(t('fuel.clearLog'))}">${icon('obstacle', { size: 16 })}</button>`
       })}
       ${section(t('nav.navlog'), 'routeSwap', fixTable(model), {
@@ -66,6 +67,23 @@ function signedWeight(value, units) {
   if (!Number.isFinite(value)) return '—';
   const sign = value > 0 ? '+' : value < 0 ? '−' : '';
   return `${sign}${fmtWeight(Math.abs(value), units)}`;
+}
+
+/**
+ * How often to be asked for a reading. Two positions, because the honest
+ * choice is between "the points that mean something" and "all of them" --
+ * anything in between is a number nobody can reason about.
+ */
+function promptModeToggle() {
+  const mode = getPromptMode();
+  const option = (value, label) =>
+    `<button class="seg-btn" data-action="prompt-mode" data-mode="${value}"
+             aria-pressed="${mode === value}">${escapeHtml(label)}</button>`;
+
+  return `<span class="seg" role="group" aria-label="${escapeHtml(t('nl.promptCadence'))}">
+    ${option('key', t('nl.modeKey'))}
+    ${option('all', t('nl.modeAll'))}
+  </span>`;
 }
 
 function fuelCheckBody(model, actuals, timeline, leg) {

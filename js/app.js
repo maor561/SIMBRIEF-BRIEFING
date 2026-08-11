@@ -27,7 +27,8 @@ import {
   reopenPhase,
   resetTimeline,
   phaseElapsed,
-  dueCheckpoint
+  dueCheckpoint,
+  setPromptMode
 } from './timeline.js';
 
 const STORAGE_USER = 'sbb.username';
@@ -504,6 +505,15 @@ document.addEventListener('click', (event) => {
       }
       break;
     }
+
+    // Switching cadence re-opens anything the new setting says is owed, so
+    // turning on every-fix mid-flight does not wait for the next one.
+    case 'prompt-mode':
+      setPromptMode(trigger.dataset.mode);
+      dismissedPrompts.clear();
+      updateFuelPrompt();
+      renderChapter({ preserveScroll: true });
+      break;
 
     case 'prompt-skip': {
       const node = document.getElementById('fuel-prompt');

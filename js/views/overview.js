@@ -235,19 +235,25 @@ function phaseChain(model, timeline) {
     const over = state !== 'pending' && expected && elapsed > expected * 1.25;
 
     return `<div class="phase ${state}${over ? ' over' : ''}">
-      <i>${escapeHtml(t(phase.labelKey))}</i>
+      <div class="phase-head">
+        <i>${escapeHtml(t(phase.labelKey))}</i>
+        ${state === 'done' ? phaseButton(phase, state) : ''}
+      </div>
       ${figure}
-      ${phaseButton(phase, state)}
+      ${state === 'done' ? '' : phaseButton(phase, state)}
     </div>`;
   }).join('');
 
   return `<div class="phase-chain">
-    <div class="phases">${chips}</div>
-    ${
-      anythingStarted
-        ? `<button class="phase-reset" data-action="timeline-reset">${escapeHtml(t('phase.reset'))}</button>`
-        : `<div class="phase-hint">${escapeHtml(t('phase.hint'))}</div>`
-    }
+    <div class="phases">
+      ${chips}
+      ${
+        anythingStarted
+          ? `<button class="phase-reset" data-action="timeline-reset">${escapeHtml(t('phase.reset'))}</button>`
+          : ''
+      }
+    </div>
+    ${anythingStarted ? '' : `<div class="phase-hint">${escapeHtml(t('phase.hint'))}</div>`}
   </div>`;
 }
 
