@@ -10,7 +10,7 @@ import { escapeHtml, fmtZulu, fmtDuration, fmtNumber } from './decode.js';
 import { getNotamFilter, notamControls, notamListMarkup } from './ui.js';
 import { layoutMasonry } from './masonry.js';
 
-import renderOverview from './views/overview.js';
+import renderOverview, { positionAircraft } from './views/overview.js';
 import renderWeather from './views/weather.js';
 import renderNotams from './views/notams.js';
 import renderFuel from './views/fuel.js';
@@ -707,10 +707,15 @@ setInterval(() => {
  */
 setInterval(() => {
   if (!state.model || document.hidden) return;
+
   for (const node of document.querySelectorAll('[data-phase-clock]')) {
     const seconds = phaseElapsed(state.timeline, node.dataset.phaseClock);
     if (seconds !== null) node.textContent = fmtDuration(seconds);
   }
+
+  // The aircraft on the schedule curve moves the same way: two custom
+  // properties, no re-render.
+  positionAircraft(state.model, state.timeline);
 }, 1000);
 
 /* ---------------------------------------------------------- fuel prompt */

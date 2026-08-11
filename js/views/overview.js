@@ -20,7 +20,9 @@ import {
   PHASE_KEYS,
   phaseState,
   phaseElapsed,
-  rebasedTimes
+  rebasedTimes,
+  actualOff,
+  actualOn
 } from '../timeline.js';
 
 export default function renderOverview({ model, findings, timeline }) {
@@ -103,6 +105,119 @@ const MARK_STEP = 68;
 
 const pct = (value, total) => `${((value / total) * 100).toFixed(2)}%`;
 
+/*
+ * The profile as data rather than as a path string.
+ *
+ * The aircraft marker has to sit *on* this line, which means something has to
+ * be able to answer "what is y at this x". Generating both the drawing and
+ * that lookup from one description is the only way they cannot drift apart --
+ * a hand-written `d` string beside a hand-written lookup would disagree the
+ * first time the curve was nudged.
+ */
+const CLIMB_TOP = CLIMB_START + 105;
+const DESCENT_TOP = DESCENT_END - 105;
+
+const PROFILE_ORIGIN = [0, GROUND_Y];
+const PROFILE = [
+  { to: [CLIMB_START, GROUND_Y] },
+  { c1: [CLIMB_START + 55, GROUND_Y], c2: [CLIMB_START + 65, CRUISE_Y], to: [CLIMB_TOP, CRUISE_Y] },
+  { to: [DESCENT_TOP, CRUISE_Y] },
+  { c1: [DESCENT_END - 65, CRUISE_Y], c2: [DESCENT_END - 55, GROUND_Y], to: [DESCENT_END, GROUND_Y] },
+  { to: [VB_W, GROUND_Y] }
+];
+
+function profilePath() {
+  return PROFILE.reduce(
+    (d, seg) =>
+      seg.c1
+        ? `${d} C${seg.c1[0]},${seg.c1[1]} ${seg.c2[0]},${seg.c2[1]} ${seg.to[0]},${seg.to[1]}`
+        : `${d} L${seg.to[0]},${seg.to[1]}`,
+    `M${PROFILE_ORIGIN[0]},${PROFILE_ORIGIN[1]}`
+  );
+}
+
+/** Where the line sits at a given x. */
+function profileY(x) {
+  let from = PROFILE_ORIGIN;
+
+  for (const seg of PROFILE) {
+    if (x <= seg.to[0]) {
+      if (!seg.c1) {
+        const span = seg.to[0] - from[0];
+        const t = span ? (x - from[0]) / span : 0;
+        return from[1] + (seg.to[1] - from[1]) * t;
+      }
+      return bezierYAtX(from, seg.c1, seg.c2, seg.to, x);
+    }
+    from = seg.to;
+  }
+
+  return GROUND_Y;
+}
+
+/**
+ * A cubic's y where its x equals a given value. x(t) climbs steadily across
+ * each of these segments, so bisection finds t without needing to solve the
+ * cubic, and twenty-four halvings put it well under a pixel.
+ */
+function bezierYAtX(p0, c1, c2, p3, x) {
+  const at = (a, b, c, d, t) => {
+    const u = 1 - t;
+    return u * u * u * a + 3 * u * u * t * b + 3 * u * t * t * c + t * t * t * d;
+  };
+
+  let lo = 0;
+  let hi = 1;
+  for (let i = 0; i < 24; i += 1) {
+    const mid = (lo + hi) / 2;
+    if (at(p0[0], c1[0], c2[0], p3[0], mid) < x) lo = mid;
+    else hi = mid;
+  }
+
+  return at(p0[1], c1[1], c2[1], p3[1], (lo + hi) / 2);
+}
+
+/**
+ * Where the aircraft is on the profile, from the clock alone.
+ *
+ * Progress is time flown over time planned, laid across the span between
+ * wheels-up and touchdown on the drawing. The curve is schematic, so this is
+ * too -- it answers "roughly where in the flight are we", which is what a
+ * glance at the band is for.
+ */
+export function aircraftPoint(model, timeline, now = Date.now()) {
+  const off = actualOff(timeline);
+  const total = model.times.estTimeEnroute;
+
+  // Nothing has happened yet: park it at the departure end of the curve.
+  if (!off || !Number.isFinite(total) || total <= 0) {
+    return { x: CLIMB_START, y: GROUND_Y, flying: false };
+  }
+
+  const on = actualOn(timeline);
+  const progress = on
+    ? 1 // Down is down, whether the flight ran long or short.
+    : Math.min(1, Math.max(0, (now - off.getTime()) / 1000 / total));
+
+  const x = CLIMB_START + progress * (DESCENT_END - CLIMB_START);
+  return { x, y: profileY(x), flying: !on, progress };
+}
+
+/**
+ * Moves the marker without re-rendering the chapter, so it can tick every
+ * second without rebuilding the DOM under the reader.
+ */
+export function positionAircraft(model, timeline, scope = document) {
+  const node = scope.querySelector('[data-aircraft]');
+  if (!node) return;
+
+  const point = aircraftPoint(model, timeline);
+  node.style.setProperty('--x', pct(point.x, VB_W));
+  node.style.setProperty('--y', pct(point.y, VB_H));
+  node.classList.toggle('flying', point.flying);
+  node.classList.toggle('parked', !point.flying && !actualOff(timeline));
+}
+
 /**
  * The schedule band: both airports, the profile curve, and the times a crew
  * is held to. Out-blocks/off/on/in are what the plan is measured against, so
@@ -168,12 +283,8 @@ function scheduleBand(model, timeline) {
     })
     .join('');
 
-  const path =
-    `M0,${GROUND_Y} L${CLIMB_START},${GROUND_Y} ` +
-    `C${CLIMB_START + 55},${GROUND_Y} ${CLIMB_START + 65},${CRUISE_Y} ${CLIMB_START + 105},${CRUISE_Y} ` +
-    `L${DESCENT_END - 105},${CRUISE_Y} ` +
-    `C${DESCENT_END - 65},${CRUISE_Y} ${DESCENT_END - 55},${GROUND_Y} ${DESCENT_END},${GROUND_Y} ` +
-    `L${VB_W},${GROUND_Y}`;
+  const path = profilePath();
+  const plane = aircraftPoint(model, timeline);
 
   const fact = (label, value) =>
     `<div><span>${escapeHtml(label)}</span><b class="ltr">${value}</b></div>`;
@@ -197,6 +308,9 @@ function scheduleBand(model, timeline) {
         ${fact(t('dep.pax'), paxFigure(model))}
       </div>
       ${dots}
+      <span class="sched-plane${plane.flying ? ' flying' : ''}${
+        plane.flying || clock.started ? '' : ' parked'
+      }" data-aircraft style="--x:${pct(plane.x, VB_W)};--y:${pct(plane.y, VB_H)}"></span>
     </div>
 
     <div class="sched-marks">${labels}</div>

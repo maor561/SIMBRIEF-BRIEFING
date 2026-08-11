@@ -1131,6 +1131,56 @@ table.fuelcheck-table .dim { color: var(--dimmer); }
   transform: translate(-50%, -50%);
 }
 
+/*
+ * The aircraft, riding the profile. Deliberately larger than the milestone
+ * dots and ringed against the panel, so on a glance at the band the eye finds
+ * where the flight *is* before it reads any of the times around it.
+ *
+ * Position rides the same two custom properties the dots use, which is what
+ * lets it be moved once a second by setting two values rather than by
+ * rebuilding the section.
+ */
+.sched-plane {
+  position: absolute;
+  left: var(--x);
+  top: var(--y);
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  background: var(--text);
+  box-shadow: 0 0 0 3px var(--panel), 0 0 14px 2px rgb(86 189 233 / 0.55);
+  transform: translate(-50%, -50%);
+  /* A second is a long step at this scale; easing it stops the jump. */
+  transition: left 0.9s linear, top 0.9s linear;
+  z-index: 2;
+}
+
+/* Airborne: lit, with a slow pulse that says the figure is live. */
+.sched-plane.flying {
+  background: var(--blue);
+  animation: plane-pulse 2.4s ease-in-out infinite;
+}
+
+/* Before wheels-up there is no real position, so it sits quietly at the gate. */
+.sched-plane.parked {
+  width: 12px;
+  height: 12px;
+  background: var(--dimmer);
+  box-shadow: 0 0 0 3px var(--panel);
+}
+
+@keyframes plane-pulse {
+  0%, 100% { box-shadow: 0 0 0 3px var(--panel), 0 0 10px 1px rgb(86 189 233 / 0.45); }
+  50% { box-shadow: 0 0 0 3px var(--panel), 0 0 20px 5px rgb(86 189 233 / 0.75); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sched-plane {
+    transition: none;
+    animation: none;
+  }
+}
+
 .sched-duration {
   position: absolute;
   left: 50%;

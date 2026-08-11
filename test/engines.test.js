@@ -28,6 +28,7 @@ import {
 } from '../js/decode.js';
 import { runwayWind } from '../js/wind.js';
 import { notamKey, isRead, markRead, markUnread, unreadCount } from '../js/notamlog.js';
+import { aircraftPoint } from '../js/views/overview.js';
 import {
   PHASES,
   getTimeline,
@@ -621,6 +622,44 @@ check('asks for fuel at the points that carry information', () => {
     (p) => p.why === 'cruise' && tod.fix.timeTotal - p.fix.timeTotal < 20 * 60
   );
   assert.deepEqual(crowding, []);
+});
+
+check('walks the aircraft along the profile with the clock', () => {
+  const off = Date.UTC(2026, 2, 11, 19, 0, 0);
+  const total = model.times.estTimeEnroute;
+
+  // Parked at the departure end until wheels-up is stamped.
+  const parked = aircraftPoint(model, { phases: {} }, off);
+  assert.equal(parked.flying, false);
+
+  const timeline = { phases: { takeoff: { at: off } } };
+  const at = (fraction) => aircraftPoint(model, timeline, off + total * 1000 * fraction);
+
+  const start = at(0);
+  const mid = at(0.5);
+  const end = at(1);
+
+  assert.equal(start.flying, true);
+  assert.equal(start.x, parked.x, 'the flight begins where it was parked');
+  assert.equal(mid.x > start.x && end.x > mid.x, true, 'it only moves forward');
+
+  // Halfway through it is at cruise, and at either end it is on the ground.
+  assert.equal(Math.round(mid.y), Math.round(at(0.5).y));
+  assert.equal(start.y > mid.y, true, 'cruise sits above the ground line');
+  assert.equal(Math.round(end.y), Math.round(start.y), 'and it lands back on it');
+
+  // It cannot run off the end, however long the flight overruns.
+  const late = at(3);
+  assert.equal(late.x, end.x);
+
+  // Once down it is at the arrival end regardless of how the timing went.
+  const landed = aircraftPoint(
+    model,
+    { phases: { takeoff: { at: off }, landing: { at: off + 60000 } } },
+    off + 60000
+  );
+  assert.equal(landed.flying, false);
+  assert.equal(landed.x, end.x, 'a short flight still finishes at the far end');
 });
 
 check('can be told to ask at every fix instead', () => {
