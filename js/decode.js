@@ -594,6 +594,42 @@ export function notamActiveDuring(notam, start, end) {
   return true;
 }
 
+/**
+ * Derives the flight category from a parsed METAR.
+ *
+ * The OFP hands its category over ready-made, so this exists only for live
+ * observations, where there is nothing but the raw string. The bands are the
+ * usual ceiling/visibility ones, and the worse of the two wins:
+ *
+ *   LIFR  ceiling < 500 ft   or visibility < 1 sm
+ *   IFR   ceiling < 1,000 ft or visibility < 3 sm
+ *   MVFR  ceiling < 3,000 ft or visibility < 5 sm
+ *   VFR   anything above
+ *
+ * No ceiling means no ceiling limit, not an unknown -- a clear sky is judged
+ * on visibility alone. A METAR with neither returns null rather than guessing.
+ */
+export function flightCategory(metar) {
+  if (!metar) return null;
+  if (metar.cavok) return 'vfr';
+
+  const ceiling = ceilingOf(metar);
+  const metres = metar.visibility?.unlimited ? 9999 : metar.visibility?.metres ?? null;
+  if (ceiling === null && metres === null) return null;
+
+  const rank = Math.max(
+    ceiling === null ? 0 : ceiling < 500 ? 3 : ceiling < 1000 ? 2 : ceiling < 3000 ? 1 : 0,
+    metres === null ? 0 : metres < 1600 ? 3 : metres < 5000 ? 2 : metres < 8000 ? 1 : 0
+  );
+
+  return ['vfr', 'mvfr', 'ifr', 'lifr'][rank];
+}
+
+/** How bad a category is, for comparing a live observation against the plan. */
+export function categoryRank(category) {
+  return ['vfr', 'mvfr', 'ifr', 'lifr'].indexOf((category || '').toLowerCase());
+}
+
 /** Flight-category colour class for a METAR category string. */
 export function categoryClass(category) {
   switch ((category || '').toLowerCase()) {

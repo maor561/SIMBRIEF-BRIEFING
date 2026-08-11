@@ -10,7 +10,15 @@
  */
 
 import { t } from '../i18n.js';
-import { escapeHtml, fmtNumber, parseMetar, parseTaf, ceilingOf, highlightWx } from '../decode.js';
+import {
+  escapeHtml,
+  fmtNumber,
+  parseMetar,
+  parseTaf,
+  ceilingOf,
+  highlightWx,
+  flightCategory
+} from '../decode.js';
 import { section, icon, chip, categoryDot } from '../ui.js';
 import { weatherStrip, buildFixDetail, defaultFix, chartsBody } from '../charts.js';
 
@@ -18,10 +26,20 @@ export default function renderWeather({ model, liveMetar }) {
   // A live METAR supersedes the OFP's snapshot for display; the snapshot is
   // what remains when there is no network.
   const live = liveMetar?.state === 'ready' ? liveMetar.metars : {};
-  const withLive = (airport) =>
-    airport && live[airport.icao] && live[airport.icao] !== airport.metar
-      ? { ...airport, metar: live[airport.icao], metarTime: liveMetar.fetchedAt, metarIsLive: true }
-      : airport;
+  const withLive = (airport) => {
+    if (!airport || !live[airport.icao] || live[airport.icao] === airport.metar) return airport;
+    const raw = live[airport.icao];
+    // The category dot has to follow the observation on screen, or the block
+    // shows current weather under the planned colour.
+    const category = flightCategory(parseMetar(raw)) || airport.metarCategory;
+    return {
+      ...airport,
+      metar: raw,
+      metarTime: liveMetar.fetchedAt,
+      metarIsLive: true,
+      metarCategory: category
+    };
+  };
 
   const alternates = model.alternates.map((a, i) =>
     airportBlock(withLive(a), model.alternates.length > 1 ? `ALTN ${i + 1}` : 'ALTN', [a.plannedRunway], a.plannedRunway)

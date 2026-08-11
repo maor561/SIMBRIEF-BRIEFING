@@ -4,8 +4,10 @@
  * Two caches with different rules, because the two kinds of content fail
  * differently:
  *
- *   shell   the app itself. Cache-first -- it only changes when deployed, and
- *           serving it from disk is also what makes a cold start instant.
+ *   shell   the app itself. Served from cache so a cold start is instant, then
+ *           refetched in the background so the copy on disk is never more than
+ *           one launch behind a deploy. Plain cache-first would pin whatever
+ *           version happened to install first until the cache name changed.
  *   data    OFP, weather, VATSIM, SimBrief images. Network-first, falling back
  *           to the last copy. Fresh when there is a connection, and the last
  *           known state rather than an error page when there is not.
@@ -74,7 +76,7 @@ self.addEventListener('fetch', (event) => {
     url.pathname.endsWith('fixture.json') ||
     url.hostname.endsWith('simbrief.com');
 
-  event.respondWith(isData ? networkFirst(request) : cacheFirst(request));
+  event.respondWith(isData ? networkFirst(request) : staleWhileRevalidate(request, event));
 });
 
 async function networkFirst(request) {
@@ -94,24 +96,40 @@ async function networkFirst(request) {
   }
 }
 
-async function cacheFirst(request) {
+/**
+ * Hands back the cached copy at once and refreshes it in the background, so
+ * the app starts instantly and still picks up a deploy on the next launch.
+ *
+ * The revalidation is deliberately not awaited when there is a hit -- waiting
+ * on it would turn every load back into a network round trip and lose the
+ * point. `waitUntil` keeps the worker alive until it finishes.
+ */
+async function staleWhileRevalidate(request, event) {
   const cached = await caches.match(request);
-  if (cached) return cached;
 
-  try {
-    const response = await fetch(request);
-    if (response.ok) {
-      const cache = await caches.open(SHELL);
-      cache.put(request, response.clone());
-    }
-    return response;
-  } catch (err) {
-    // A navigation that misses everything still gets the shell, so the app
-    // opens offline instead of showing the browser's error page.
-    if (request.mode === 'navigate') {
-      const shell = await caches.match('./index.html');
-      if (shell) return shell;
-    }
-    throw err;
+  const network = fetch(request)
+    .then(async (response) => {
+      if (response.ok) {
+        const cache = await caches.open(SHELL);
+        await cache.put(request, response.clone());
+      }
+      return response;
+    })
+    .catch(() => null);
+
+  if (cached) {
+    event.waitUntil(network);
+    return cached;
   }
+
+  const response = await network;
+  if (response) return response;
+
+  // A navigation that misses everything still gets the shell, so the app
+  // opens offline instead of showing the browser's error page.
+  if (request.mode === 'navigate') {
+    const shell = await caches.match('./index.html');
+    if (shell) return shell;
+  }
+  return Response.error();
 }

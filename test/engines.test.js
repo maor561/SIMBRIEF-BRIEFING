@@ -22,8 +22,12 @@ import {
   notamSeverity,
   mentionsRunway,
   notamActiveDuring,
-  screenEnrouteNotam
+  screenEnrouteNotam,
+  flightCategory,
+  categoryRank
 } from '../js/decode.js';
+import { runwayWind } from '../js/wind.js';
+import { notamKey, isRead, markRead, markUnread, unreadCount } from '../js/notamlog.js';
 
 const fixturePath = fileURLToPath(new URL('./fixture.json', import.meta.url));
 const raw = JSON.parse(readFileSync(fixturePath, 'utf8'));
@@ -441,6 +445,120 @@ check('handles a runway with no V speeds', () => {
 
 check('rejects an unrecognised payload', () => {
   assert.throws(() => normalizeOfp({}), /Unrecognised OFP/);
+});
+
+/* --------------------------------------------- live weather against the plan */
+
+check('derives the flight category from a raw observation', () => {
+  assert.equal(flightCategory(parseMetar('LEBL 101630Z 09007KT CAVOK 30/28 Q1015')), 'vfr');
+  // 400ft overcast is LIFR on ceiling alone, whatever the visibility says.
+  assert.equal(flightCategory(parseMetar('LEBL 101630Z 09007KT 9999 OVC004 10/09 Q1015')), 'lifr');
+  // 2,000m visibility is IFR even under a clear sky.
+  assert.equal(flightCategory(parseMetar('LEBL 101630Z 09007KT 2000 10/09 Q1015')), 'ifr');
+  // The worse of the two drives it: MVFR ceiling, IFR visibility -> IFR.
+  assert.equal(flightCategory(parseMetar('LEBL 101630Z 09007KT 3000 BKN020 10/09 Q1015')), 'ifr');
+  assert.equal(categoryRank('lifr') > categoryRank('vfr'), true);
+});
+
+check('resolves the live wind onto the planned runway', () => {
+  const runway = model.tlr.takeoff.runways.find((r) => r.identifier === '24L');
+  assert.ok(runway, 'the fixture plans 24L');
+
+  // Straight down 24L, whose true course is 246: all headwind, no crosswind.
+  assert.equal(runway.trueCourse, 246);
+  const down = runwayWind(runway, parseMetar('LEBL 101630Z 24615KT 9999 20/10 Q1015'));
+  assert.equal(down.headwind, 15);
+  assert.equal(down.crosswind, 0);
+
+  // From behind: a tailwind is a negative headwind, and worstTailwind names it.
+  const behind = runwayWind(runway, parseMetar('LEBL 101630Z 05910KT 9999 20/10 Q1015'));
+  assert.equal(behind.headwind, -10);
+  assert.equal(behind.worstTailwind, 10);
+});
+
+check('assesses gusts and a variable arc as the worst case', () => {
+  const runway = model.tlr.takeoff.runways.find((r) => r.identifier === '24L');
+
+  // Crosswind is judged on the gust, not the mean.
+  const gusty = runwayWind(runway, parseMetar('LEBL 101630Z 14915G30KT 9999 20/10 Q1015'));
+  assert.equal(gusty.crosswind, 15, 'steady crosswind from the mean');
+  assert.equal(gusty.worstCrosswind, 30, 'but the gust is what has to be flown');
+
+  // A wind free to sit anywhere in 060V150 must be judged at its worst point.
+  const variable = runwayWind(runway, parseMetar('LEBL 101630Z 09020KT 060V150 9999 20/10 Q1015'));
+  assert.equal(variable.worstCrosswind >= variable.crosswind, true);
+  assert.equal(variable.arc.from, 60);
+  assert.equal(variable.arc.to, 150);
+});
+
+check('says nothing about a wind with no direction', () => {
+  const runway = model.tlr.takeoff.runways.find((r) => r.identifier === '24L');
+  assert.equal(runwayWind(runway, parseMetar('LEBL 101630Z 00000KT 9999 20/10 Q1015')).calm, true);
+  assert.equal(
+    runwayWind(runway, parseMetar('LEBL 101630Z VRB04KT 9999 20/10 Q1015')).variable,
+    true
+  );
+});
+
+/* -------------------------------------------------------- NOTAM read state */
+
+check('keys a NOTAM by its number, falling back to its text', () => {
+  assert.equal(notamKey({ id: ' a1234/25 ' }), 'A1234/25');
+
+  // Two untitled NOTAMs must not collapse onto one key.
+  const one = notamKey({ text: 'RWY 06L/24R CLOSED' });
+  const two = notamKey({ text: 'TWY B CLOSED' });
+  assert.notEqual(one, two);
+  assert.equal(notamKey({ text: 'RWY 06L/24R CLOSED' }), one, 'and the key is stable');
+
+  assert.equal(notamKey({}), null, 'nothing to key on');
+});
+
+check('remembers which NOTAMs have been read', () => {
+  const store = {};
+  globalThis.localStorage = {
+    getItem: (k) => store[k] ?? null,
+    setItem: (k, v) => {
+      store[k] = v;
+    }
+  };
+
+  const notams = model.origin.notams;
+  assert.equal(unreadCount(notams), notams.length, 'everything is unread to begin with');
+
+  markRead(notams);
+  assert.equal(unreadCount(notams), 0);
+  assert.equal(isRead(notams[0]), true);
+
+  // A NOTAM that was not in the batch stays unread -- this is what makes the
+  // second pass through a briefing worth doing.
+  const arrival = model.destination.notams[0];
+  assert.equal(isRead(arrival), false);
+
+  markUnread(notams);
+  assert.equal(unreadCount(notams), notams.length);
+
+  delete globalThis.localStorage;
+});
+
+check('raises a finding when the live weather has moved off the plan', () => {
+  const live = {
+    state: 'ready',
+    metars: {
+      // Planned 239/14 down 24L; this puts it behind and across, in fog.
+      [model.origin.icao]: 'LEBL 101630Z 05925G40KT 0500 OVC002 10/09 Q1015'
+    }
+  };
+
+  const withLive = analyze(model, live);
+  const titles = withLive.map((f) => f.title).join(' | ');
+
+  assert.match(titles, /now downwind/, 'a planned headwind that became a tailwind');
+  assert.match(titles, /deteriorated since planning/, 'VFR plan, LIFR observation');
+
+  // And none of it appears without the live feed.
+  const planOnly = analyze(model).map((f) => f.title).join(' | ');
+  assert.equal(/now downwind|deteriorated since planning/.test(planOnly), false);
 });
 
 console.log(`\n${passed} passed, ${failed} failed\n`);

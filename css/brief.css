@@ -727,15 +727,28 @@ table.navlog-table th { padding: 6px 8px; }
   border-block-end: 1px solid var(--line-solid);
 }
 
+/*
+ * Label, planned figure, live figure -- one grid so the columns line up down
+ * the block. The rows are `display: contents` so their cells join that grid
+ * directly; the third column only exists when a live observation is in.
+ */
 .perf-wind-figs {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
-  gap: 12px 20px;
+  grid-template-columns: 1fr auto;
+  align-items: baseline;
+  gap: 9px 22px;
   flex: 1;
 }
 
+.perf-wind-figs.compare {
+  grid-template-columns: 1fr auto auto;
+}
+
+.perf-wind-row {
+  display: contents;
+}
+
 .perf-wind-figs .k {
-  display: block;
   font-size: 10.5px;
   letter-spacing: 0.05em;
   text-transform: uppercase;
@@ -743,10 +756,36 @@ table.navlog-table th { padding: 6px 8px; }
 }
 
 .perf-wind-figs .v {
-  display: block;
-  margin-block-start: 3px;
   font-size: 17px;
   font-weight: 700;
+  text-align: end;
+  min-width: 86px;
+}
+
+/* The column header row: small, quiet, just enough to name the two columns. */
+.perf-wind-row.head .v {
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--dimmer);
+}
+
+/* The live column reads as the live colour everywhere else in the app does. */
+.perf-wind-figs .v.live {
+  color: var(--blue);
+}
+
+.perf-wind-figs .v.live.good { color: var(--green); }
+.perf-wind-figs .v.live.warn { color: var(--amber); }
+.perf-wind-figs .v.live.bad { color: var(--red); }
+
+/* The worst-case figure behind the steady one: present, clearly secondary. */
+.perf-wind-figs .v i {
+  font-style: normal;
+  font-size: 11px;
+  font-weight: 600;
+  opacity: 0.65;
 }
 
 .sect-field .v .good,
@@ -1831,6 +1870,47 @@ table.fuelcheck-table .dim { color: var(--dimmer); }
   background: var(--blue-bg);
   border-color: var(--blue);
   color: var(--blue);
+}
+
+/* The square button is for icons; this variant carries a word. */
+.notam-btn.wide {
+  width: auto;
+  height: 26px;
+  padding: 0 10px;
+  gap: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  background: var(--blue-bg);
+  border-color: var(--blue);
+  color: var(--blue);
+}
+
+.notam-btn.wide.muted {
+  background: transparent;
+  border-color: var(--line-solid);
+  color: var(--dimmer);
+}
+
+/*
+ * An unread NOTAM carries a marker and a lit edge. The edge is what makes a
+ * second pass down the list quick: the eye finds the stripe without reading
+ * a single number.
+ */
+.notam-unread {
+  align-self: center;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: var(--blue);
+  color: var(--bg);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+}
+
+.notam.unread {
+  border-inline-start: 2px solid var(--blue);
 }
 
 .notam-toggles {

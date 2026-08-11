@@ -16,6 +16,7 @@
 import { t } from '../i18n.js';
 import { escapeHtml, notamSeverity } from '../decode.js';
 import { section, chip, airportHead, notamControls, notamListMarkup } from '../ui.js';
+import { unreadCount } from '../notamlog.js';
 import { enrouteNotams } from '../charts.js';
 
 export default function renderNotams({ model }) {
@@ -65,6 +66,7 @@ export default function renderNotams({ model }) {
 
 function airportSection({ airport, role, title, runways, planned }, window) {
   const critical = airport.notams.filter((n) => notamSeverity(n, airport.plannedRunway) === 3).length;
+  const unread = unreadCount(airport.notams);
 
   const badge = `${critical ? chip(`${critical} ${t('sev.critical')}`, 'red') : ''}${chip(
     `${airport.notams.length} ${t('notam.count')}`
@@ -76,8 +78,14 @@ function airportSection({ airport, role, title, runways, planned }, window) {
     <div data-notam-list data-icao="${airport.icao}">${notamListMarkup(airport, window)}</div>
   `;
 
+  // The unread count leads the header: on a second pass through the briefing
+  // it is the only number that has changed since the first.
+  const readAction = unread
+    ? `<button class="notam-btn wide" data-action="notams-read" data-icao="${escapeHtml(airport.icao)}">${unread} ${escapeHtml(t('notam.unread'))} · ${escapeHtml(t('notam.markRead'))}</button>`
+    : `<button class="notam-btn wide muted" data-action="notams-unread" data-icao="${escapeHtml(airport.icao)}">${escapeHtml(t('notam.allRead'))}</button>`;
+
   return section(title, null, body, {
-    action: `<span class="sect-flag ${critical ? 'bad' : ''}">${badge}</span>`,
+    action: `${readAction}<span class="sect-flag ${critical ? 'bad' : ''}">${badge}</span>`,
     cls: critical ? 'accent-red' : ''
   });
 }

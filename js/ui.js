@@ -28,6 +28,7 @@ import {
   decodeSurface
 } from './decode.js';
 import { severityClass, severityLabel, SEVERITY } from './analyze.js';
+import { isRead } from './notamlog.js';
 
 export const html = (strings, ...values) =>
   strings.reduce((out, chunk, i) => out + chunk + (values[i] ?? ''), '');
@@ -489,14 +490,16 @@ function notamArticle(notam, severity, expanded) {
   // the same weight on every keyword, where the split between "which
   // facility" and "what happened to it" is the whole point of the colouring.
   const body = highlightNotam(notam.text || notam.raw || '');
+  const unread = !isRead(notam);
 
-  return `<article class="notam sev-${severity} ${expanded ? 'expanded' : ''}">
+  return `<article class="notam sev-${severity} ${expanded ? 'expanded' : ''}${unread ? ' unread' : ''}">
     <div class="notam-cols">
       ${col(t('notam.age'), notamAge(notam))}
       ${col(t('notam.number'), notam.id || '—')}
       ${col(t('notam.start'), stamp(notam.effective))}
       ${col(t('notam.end'), notam.expires ? `${stamp(notam.expires)}${notam.expiryEstimated ? ' EST' : ''}` : t('common.none'))}
       <span class="notam-kind">${icon(notamIconName(notam), { size: 15 })}</span>
+      ${unread ? `<span class="notam-unread">${escapeHtml(t('notam.unread'))}</span>` : ''}
     </div>
     ${
       notam.subject || notam.status

@@ -13,8 +13,12 @@ import {
   fmtWeight,
   notamSeverity,
   notamActiveDuring,
-  mentionsRunway
+  mentionsRunway,
+  parseMetar,
+  flightCategory,
+  categoryRank
 } from './decode.js';
+import { runwayWind } from './wind.js';
 
 export const SEVERITY = { CRITICAL: 3, WARNING: 2, INFO: 1 };
 
@@ -410,13 +414,108 @@ function checkNotams(model, findings) {
   }
 }
 
+/* ------------------------------------------------------------ live weather */
+
+/**
+ * Compares the current observation against the one the plan was built on.
+ *
+ * Everything else in this file judges the plan against fixed limits. This is
+ * the only check that judges the plan against reality, and it is the reason a
+ * live METAR is worth fetching at all: the numbers on the other screens were
+ * computed for weather that has since moved on.
+ */
+function checkLiveWeather(model, live, findings) {
+  if (!live || live.state !== 'ready') return;
+
+  for (const [airport, role] of [
+    [model.origin, t('dep.title')],
+    [model.destination, t('arr.title')],
+    ...model.alternates.map((a) => [a, t('arr.alternate')])
+  ]) {
+    const raw = airport && live.metars?.[airport.icao];
+    if (!raw || raw === airport.metar) continue;
+
+    const observed = parseMetar(raw);
+    const now = flightCategory(observed);
+    const planned = airport.metarCategory;
+
+    if (now && planned && categoryRank(now) > categoryRank(planned)) {
+      const critical = categoryRank(now) >= 2; // IFR or worse
+      findings.push(
+        finding(
+          critical ? SEVERITY.CRITICAL : SEVERITY.WARNING,
+          'weather',
+          `${airport.icao} has deteriorated since planning`,
+          `Planned ${planned.toUpperCase()}, now ${now.toUpperCase()} on the current observation.`,
+          { value: now.toUpperCase(), threshold: planned.toUpperCase(), role }
+        )
+      );
+    }
+  }
+
+  checkLiveWind(model, live, findings);
+}
+
+/** The live wind resolved onto the runway the takeoff numbers assume. */
+function checkLiveWind(model, live, findings) {
+  const tlr = model.tlr.takeoff;
+  const runway = tlr?.runways.find((r) => r.identifier === tlr.plannedRunway) || tlr?.runways[0];
+  const raw = model.origin && live.metars?.[model.origin.icao];
+  if (!runway || !raw) return;
+
+  const wind = runwayWind(runway, parseMetar(raw));
+  if (!wind || wind.calm || wind.variable) return;
+
+  if (wind.worstCrosswind >= THRESHOLDS.crosswindCritical) {
+    findings.push(
+      finding(
+        SEVERITY.CRITICAL,
+        'performance',
+        `Crosswind on runway ${runway.identifier} is at the limit`,
+        `${wind.worstCrosswind}kt on the current observation; the plan assumed ${runway.crosswind}kt.`,
+        { value: wind.worstCrosswind, threshold: THRESHOLDS.crosswindCritical }
+      )
+    );
+  } else if (
+    wind.worstCrosswind >= THRESHOLDS.crosswindCaution &&
+    runway.crosswind < THRESHOLDS.crosswindCaution
+  ) {
+    findings.push(
+      finding(
+        SEVERITY.WARNING,
+        'performance',
+        `Crosswind on runway ${runway.identifier} has risen`,
+        `${runway.crosswind}kt planned, ${wind.worstCrosswind}kt on the current observation.`,
+        { value: wind.worstCrosswind, threshold: THRESHOLDS.crosswindCaution }
+      )
+    );
+  }
+
+  // A runway planned into wind and now downwind changes the takeoff case, not
+  // just the margin.
+  if (runway.headwind > 0 && wind.headwind < 0) {
+    findings.push(
+      finding(
+        wind.worstTailwind >= THRESHOLDS.tailwindLimit ? SEVERITY.CRITICAL : SEVERITY.WARNING,
+        'performance',
+        `Runway ${runway.identifier} is now downwind`,
+        `Planned with ${runway.headwind}kt of headwind; the current observation gives ${Math.abs(wind.headwind)}kt of tailwind.`,
+        { value: Math.abs(wind.headwind), threshold: THRESHOLDS.tailwindLimit }
+      )
+    );
+  }
+}
+
 /* -------------------------------------------------------------------- entry */
 
 /**
  * Runs every check and returns findings sorted most severe first.
  * Also stashes a couple of derived values on the model that views reuse.
+ *
+ * `liveMetar` is optional and arrives after the first render, so analyze is
+ * re-run when it lands rather than blocking the briefing on the network.
  */
-export function analyze(model) {
+export function analyze(model, liveMetar = null) {
   const findings = [];
 
   checkRouteWeather(model, findings);
@@ -425,6 +524,7 @@ export function analyze(model) {
   checkFuel(model, findings);
   checkRunwayPerformance(model, findings);
   checkNotams(model, findings);
+  checkLiveWeather(model, liveMetar, findings);
 
   findings.sort((a, b) => b.severity - a.severity);
   findings.forEach((f, i) => {

@@ -12,8 +12,10 @@ import {
   fmtFeet,
   fmtWeight,
   decodeLimitCode,
-  decodeSurface
+  decodeSurface,
+  parseMetar
 } from '../decode.js';
+import { runwayWind } from '../wind.js';
 import {
   section,
   meter,
@@ -25,7 +27,7 @@ import {
 } from '../ui.js';
 import { THRESHOLDS } from '../analyze.js';
 
-export default function renderPerformance({ model }) {
+export default function renderPerformance({ model, liveMetar }) {
   const takeoff = model.tlr.takeoff;
   const landing = model.tlr.landing;
 
@@ -33,7 +35,7 @@ export default function renderPerformance({ model }) {
 
   return `
     <div class="cover">
-      ${section(t('to.title'), 'aircraft', takeoffSection(model, takeoff, takeoffRunway), {
+      ${section(t('to.title'), 'aircraft', takeoffSection(model, takeoff, takeoffRunway, liveWind(model.origin, takeoffRunway, liveMetar)), {
         action: takeoffRunway?.limitCode
           ? `<span class="sect-flag warn">${escapeHtml(t('to.limitedBy'))}: ${escapeHtml(decodeLimitCode(takeoffRunway.limitCode))}</span>`
           : ''
@@ -45,11 +47,24 @@ export default function renderPerformance({ model }) {
 }
 
 /**
+ * The current wind resolved onto the runway the numbers were computed for.
+ * Returns null unless a live observation actually arrived, so the screen falls
+ * back to the plan alone rather than showing an empty comparison.
+ */
+export function liveWind(airport, runway, liveMetar) {
+  if (!airport || !runway || liveMetar?.state !== 'ready') return null;
+  const raw = liveMetar.metars?.[airport.icao];
+  if (!raw) return null;
+  const resolved = runwayWind(runway, parseMetar(raw));
+  return resolved ? { ...resolved, at: liveMetar.fetchedAt } : null;
+}
+
+/**
  * Departure end: the field strip, the planned runway in full, the conditions
  * the numbers were computed for, the configuration they assume, and every
  * other runway in case of a late change.
  */
-function takeoffSection(model, tlr, runway) {
+function takeoffSection(model, tlr, runway, live) {
   if (!tlr) return notAvailable();
 
   return `
@@ -62,7 +77,7 @@ function takeoffSection(model, tlr, runway) {
     ${subHead(`${t('to.perfFor')} — ${runway?.identifier || ''}`)}
     ${takeoffBody(model, tlr, runway)}
     ${subHead(t('to.conditions'))}
-    ${conditionsBody(tlr, runway)}
+    ${conditionsBody(tlr, runway, live)}
     ${subHead(t('to.config'))}
     ${configBody(model, tlr, runway)}
     ${subHead(`${t('to.otherRunways')} (${Math.max(0, tlr.runways.length - 1)})`)}
@@ -157,40 +172,47 @@ function marginValue(margin) {
   return `<span class="${tone}">${fmtFeet(margin)}</span>`;
 }
 
-/* Wind first: the component figures are what decides technique. */
-function conditionsBody(tlr, runway) {
+/*
+ * Wind first: the component figures are what decides technique.
+ *
+ * When a live observation is in, each figure gets a second column. The planned
+ * number is what the takeoff data assumes; the live one is what the aircraft
+ * will actually meet, and the gap between them is the reason to look.
+ */
+function conditionsBody(tlr, runway, live) {
   const headwind = runway?.headwind;
   const crosswind = runway?.crosswind;
   const isTailwind = Number.isFinite(headwind) && headwind < 0;
 
-  const crosswindTone = !Number.isFinite(crosswind)
-    ? ''
-    : crosswind >= THRESHOLDS.crosswindCritical
-    ? 'bad'
-    : crosswind >= THRESHOLDS.crosswindCaution
-    ? 'warn'
-    : 'good';
-
   return `
     <div class="perf-wind">
       ${windRose(tlr.windDir, tlr.windSpd, runway?.magneticCourse)}
-      <div class="perf-wind-figs">
-        <div>
-          <span class="k">${escapeHtml(t('common.wind'))}</span>
-          <span class="v ltr">${tlr.windDir ?? '—'}° / ${tlr.windSpd ?? '—'} kt</span>
-        </div>
-        <div>
-          <span class="k">${escapeHtml(isTailwind ? t('to.tailwind') : t('to.headwind'))}</span>
-          <span class="v ltr ${isTailwind ? 'bad' : 'good'}">${
-            Number.isFinite(headwind) ? `${Math.abs(headwind)} kt` : '—'
-          }</span>
-        </div>
-        <div>
-          <span class="k">${escapeHtml(t('to.crosswind'))}</span>
-          <span class="v ltr ${crosswindTone}">${Number.isFinite(crosswind) ? `${crosswind} kt` : '—'}</span>
-        </div>
+      <div class="perf-wind-figs${live ? ' compare' : ''}">
+        ${live ? windCompareHead() : ''}
+        ${windRow(
+          t('common.wind'),
+          `${tlr.windDir ?? '—'}° / ${tlr.windSpd ?? '—'} kt`,
+          '',
+          live && liveWindText(live),
+          ''
+        )}
+        ${windRow(
+          t('to.alongRunway'),
+          alongText(headwind),
+          isTailwind ? 'bad' : 'good',
+          live && alongText(live.headwind, live.worstTailwind),
+          live && live.worstTailwind > 0 ? 'bad' : 'good'
+        )}
+        ${windRow(
+          t('to.crosswind'),
+          Number.isFinite(crosswind) ? `${crosswind} kt` : '—',
+          crosswindTone(crosswind),
+          live && crossText(live.crosswind, live.worstCrosswind),
+          live && crosswindTone(live.worstCrosswind)
+        )}
       </div>
     </div>
+    ${live ? windDelta(crosswind, headwind, live) : ''}
 
     ${fields([
       [t('common.temp'), tlr.temperature === null ? '—' : `${tlr.temperature}°C`],
@@ -199,6 +221,110 @@ function conditionsBody(tlr, runway) {
       [t('common.planned'), fmtWeight(tlr.plannedWeight, 'kgs')]
     ])}
   `;
+}
+
+function crosswindTone(value) {
+  if (!Number.isFinite(value)) return '';
+  if (value >= THRESHOLDS.crosswindCritical) return 'bad';
+  if (value >= THRESHOLDS.crosswindCaution) return 'warn';
+  return 'good';
+}
+
+function windCompareHead() {
+  return `<div class="perf-wind-row head">
+    <span class="k"></span>
+    <span class="v">${escapeHtml(t('common.planned'))}</span>
+    <span class="v">${escapeHtml(t('perf.now'))}</span>
+  </div>`;
+}
+
+/* Both value cells carry markup their builders assembled from numbers and
+ * translated labels, so neither is escaped here. */
+function windRow(label, planned, plannedTone, liveText, liveTone) {
+  return `<div class="perf-wind-row">
+    <span class="k">${escapeHtml(label)}</span>
+    <span class="v ltr ${plannedTone}">${planned}</span>
+    ${liveText === undefined || liveText === null || liveText === false ? '' : `<span class="v ltr live ${liveTone || ''}">${liveText}</span>`}
+  </div>`;
+}
+
+function liveWindText(live) {
+  if (live.calm) return 'CALM';
+  if (live.variable) return `VRB ${live.speed ?? '—'} kt`;
+  const gust = live.gustSpeed ? `G${live.gustSpeed}` : '';
+  return escapeHtml(`${String(live.direction).padStart(3, '0')}° / ${live.speed}${gust} kt`);
+}
+
+/**
+ * The along-runway component, carrying its own sense.
+ *
+ * Head and tail share one row because they are one number with a sign, but the
+ * sign is the whole story -- the planned wind can be a headwind and the live
+ * one a tailwind off the same runway. Naming it in the cell means neither
+ * column can be read under the other's label.
+ */
+function alongText(component, worstTailwind) {
+  if (!Number.isFinite(component)) return '—';
+
+  const sense = component < 0 ? t('to.tailShort') : t('to.headShort');
+  const text = `${Math.abs(component)} kt <i>${sense}</i>`;
+
+  // A gust or a variable arc can turn a headwind into a tailwind; that worst
+  // case belongs beside the steady figure, not hidden behind it.
+  return Number.isFinite(worstTailwind) && worstTailwind > Math.max(0, -component)
+    ? `${text} <i>· ${worstTailwind} ${t('to.tailShort')} max</i>`
+    : text;
+}
+
+/**
+ * The steady crosswind, and behind it the worst the wind is entitled to reach
+ * given its gust and any variable arc -- the figure a limit is checked
+ * against, shown whenever it differs from the steady one.
+ */
+function crossText(steady, worst) {
+  if (!Number.isFinite(steady)) return '—';
+  return worst > steady ? `${steady} kt <i>${worst} max</i>` : `${steady} kt`;
+}
+
+/**
+ * Says out loud when the live wind has moved the takeoff away from what was
+ * planned. Silent when nothing meaningful changed -- a line that always shows
+ * up stops being read.
+ */
+function windDelta(plannedCrosswind, plannedHeadwind, live) {
+  const notes = [];
+  const worst = live.worstCrosswind;
+
+  if (Number.isFinite(worst) && Number.isFinite(plannedCrosswind)) {
+    const change = worst - plannedCrosswind;
+    if (worst >= THRESHOLDS.crosswindCritical) {
+      notes.push({
+        tone: 'bad',
+        text: `${t('perf.xwNow')} ${worst} kt — ${t('perf.xwOverLimit')} (${THRESHOLDS.crosswindCritical} kt).`
+      });
+    } else if (worst >= THRESHOLDS.crosswindCaution && plannedCrosswind < THRESHOLDS.crosswindCaution) {
+      notes.push({ tone: 'warn', text: `${t('perf.xwRose')} ${plannedCrosswind} → ${worst} kt.` });
+    } else if (Math.abs(change) >= 8) {
+      notes.push({ tone: '', text: `${t('perf.xwChanged')} ${plannedCrosswind} → ${worst} kt.` });
+    }
+  }
+
+  const plannedTail = Number.isFinite(plannedHeadwind) && plannedHeadwind < 0 ? -plannedHeadwind : 0;
+  if (live.worstTailwind >= 10 && live.worstTailwind > plannedTail) {
+    notes.push({ tone: 'bad', text: `${t('perf.tailNow')} ${live.worstTailwind} kt.` });
+  } else if (plannedHeadwind > 0 && live.headwind < 0) {
+    // Not a matter of degree: the runway was planned into wind and is now
+    // downwind, which lengthens the takeoff roll rather than shortening it.
+    notes.push({
+      tone: 'warn',
+      text: `${t('perf.senseFlip')} ${plannedHeadwind} kt ${t('to.headShort')} → ${Math.abs(live.headwind)} kt ${t('to.tailShort')}.`
+    });
+  }
+
+  if (!notes.length) return '';
+  return notes
+    .map((n) => `<div class="atc-note ${n.tone}">${escapeHtml(n.text)}</div>`)
+    .join('');
 }
 
 function configBody(model, tlr, runway) {

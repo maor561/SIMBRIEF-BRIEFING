@@ -19,6 +19,7 @@ import renderNavlog, { diffCell, summaryPanel, summaryFlag } from './views/navlo
 import renderAtc from './views/atc.js';
 import { buildFixDetail } from './charts.js';
 import { setActual, classify, clearActuals } from './fuellog.js';
+import { markRead, markUnread } from './notamlog.js';
 
 const STORAGE_USER = 'sbb.username';
 
@@ -198,7 +199,9 @@ function renderChapter({ preserveScroll = false } = {}) {
     liveMetar: state.liveMetar
   });
   if (chapter.id === 'atc') ensureVatsim();
-  if (chapter.id === 'weather') ensureLiveMetar();
+  // Performance wants it too: the live wind is what its takeoff figures get
+  // compared against.
+  if (chapter.id === 'weather' || chapter.id === 'performance') ensureLiveMetar();
   // Masonry moves card nodes into freshly built row/column wrappers, so it
   // must run on the flat list renderChapter just produced -- calling it
   // again on an already-laid-out tree would nest wrappers instead of
@@ -207,6 +210,61 @@ function renderChapter({ preserveScroll = false } = {}) {
   layoutMasonry(el.content);
   el.content.scrollTop = scrollTop;
 }
+
+/** Finds one of the plan's airports by code, for actions that name one. */
+function airportByIcao(icao) {
+  if (!icao || !state.model) return null;
+  return (
+    [state.model.origin, state.model.destination, ...state.model.alternates].find(
+      (a) => a?.icao === icao
+    ) || null
+  );
+}
+
+/* ------------------------------------------------------------- freshness */
+
+/**
+ * Keeps the live feeds from going stale on a tablet left on the stand.
+ *
+ * Deliberately age-based rather than a 30-minute interval: an interval stops
+ * firing while the device sleeps and comes back believing it is on schedule.
+ * Sweeping every minute and asking how old each feed actually is means waking
+ * from an hour asleep refreshes at once, which is exactly when the weather on
+ * screen is least likely to still be true.
+ *
+ * Only feeds already pulled once are refreshed. Never opening ATC should not
+ * start polling VATSIM in the background.
+ */
+const LIVE_MAX_AGE_MS = 30 * 60 * 1000;
+const FRESHNESS_TICK_MS = 60 * 1000;
+
+function isStale(feed) {
+  if (!feed || feed.state === 'loading') return false;
+  const at = new Date(feed.fetchedAt ?? 0).getTime();
+  return !Number.isFinite(at) || Date.now() - at >= LIVE_MAX_AGE_MS;
+}
+
+function refreshStaleFeeds() {
+  // Nothing to refresh before a briefing is loaded, and no point spending a
+  // request on a screen nobody is looking at.
+  if (!state.model || document.hidden) return;
+
+  if (isStale(state.liveMetar)) {
+    state.liveMetar = null;
+    ensureLiveMetar();
+  }
+  if (isStale(state.vatsim)) {
+    state.vatsim = null;
+    ensureVatsim();
+  }
+}
+
+setInterval(refreshStaleFeeds, FRESHNESS_TICK_MS);
+// Coming back to the tab is the moment the figures are about to be read, so
+// the age check runs then too rather than waiting for the next tick.
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) refreshStaleFeeds();
+});
 
 /** Briefly swaps a button's label to confirm what just happened. */
 function flash(button, message) {
@@ -230,9 +288,9 @@ async function ensureVatsim() {
   try {
     const response = await fetch('api/vatsim', LIVE_FETCH);
     if (!response.ok) throw new Error(`vatsim ${response.status}`);
-    state.vatsim = { state: 'ready', feed: await response.json() };
+    state.vatsim = { state: 'ready', feed: await response.json(), fetchedAt: Date.now() };
   } catch {
-    state.vatsim = { state: 'error', feed: null };
+    state.vatsim = { state: 'error', feed: null, fetchedAt: Date.now() };
   }
 
   if (state.chapter === 'atc') renderChapter({ preserveScroll: true });
@@ -260,10 +318,19 @@ async function ensureLiveMetar() {
     const payload = await response.json();
     state.liveMetar = { state: 'ready', metars: payload.metars || {}, fetchedAt: payload.fetchedAt };
   } catch {
-    state.liveMetar = { state: 'error', metars: {} };
+    // Stamped even on failure, so the retry waits a full cycle instead of the
+    // freshness sweep hammering an endpoint that is plainly down.
+    state.liveMetar = { state: 'error', metars: {}, fetchedAt: new Date().toISOString() };
   }
 
-  if (state.chapter === 'weather') renderChapter({ preserveScroll: true });
+  // The live observation feeds the exception engine as well as the screens,
+  // so the findings and their nav badges are rebuilt with it.
+  state.findings = analyze(state.model, state.liveMetar);
+  renderRail();
+
+  if (state.chapter === 'weather' || state.chapter === 'performance') {
+    renderChapter({ preserveScroll: true });
+  }
 }
 
 function goToChapter(id, findingId) {
@@ -374,6 +441,18 @@ document.addEventListener('click', (event) => {
     case 'notam-full':
       trigger.closest('.notam')?.classList.toggle('expanded');
       break;
+
+    // Reading through an airport's NOTAMs and saying so is what makes the
+    // next pass useful -- whatever is still flagged is what arrived since.
+    case 'notams-read':
+    case 'notams-unread': {
+      const airport = airportByIcao(trigger.dataset.icao);
+      if (!airport) break;
+      if (trigger.dataset.action === 'notams-read') markRead(airport.notams);
+      else markUnread(airport.notams);
+      renderChapter({ preserveScroll: true });
+      break;
+    }
 
     case 'clear-fuel-log':
       clearActuals(state.model);
