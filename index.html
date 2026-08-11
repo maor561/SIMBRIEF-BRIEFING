@@ -12,6 +12,10 @@
 <meta name="apple-mobile-web-app-title" content="Briefing">
 <title>Flight Briefing · SimBrief</title>
 <link rel="manifest" href="manifest.webmanifest">
+<!-- Without this the browser asks for /favicon.ico and gets a 404. Reuses the
+     icon the manifest already ships rather than adding a second asset. -->
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/icon.svg">
 <link rel="stylesheet" href="css/brief.css">
 </head>
 <body>

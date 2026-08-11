@@ -25,6 +25,7 @@ const SHELL_FILES = [
   './index.html',
   './css/brief.css',
   './manifest.webmanifest',
+  './icons/icon.svg',
   './js/app.js',
   './js/i18n.js',
   './js/normalize.js',

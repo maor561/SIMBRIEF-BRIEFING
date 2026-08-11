@@ -745,16 +745,34 @@ const dismissedPrompts = new Set();
  * offline -- which is exactly the situation this app is built for. Two sine
  * tones with a soft envelope cost nothing and always work.
  *
- * The context is created on first use because a browser will not start one
- * before the page has been interacted with, and everything here is wrapped:
- * a device with audio blocked or unavailable still gets the prompt, just
- * silently.
+ * The context is opened on the first tap or keypress rather than when a chime
+ * is wanted. A browser refuses to start audio until the page has been
+ * interacted with, and the prompt is raised by a timer, not by a tap -- so
+ * building the context at that moment is guaranteed to be refused and to log
+ * a warning for every tone. Opening it on a gesture the crew was making
+ * anyway means it is already running by the time anything needs to sound.
  */
 let audio = null;
 
-function chime() {
+function openAudio() {
   try {
     audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+    if (audio.state === 'suspended') audio.resume();
+  } catch {
+    /* no audio on this device; prompts stay silent */
+  }
+}
+
+['pointerdown', 'keydown'].forEach((type) =>
+  addEventListener(type, openAudio, { once: true, passive: true })
+);
+
+function chime() {
+  // Nothing has been touched yet, so audio is not permitted. Staying quiet is
+  // the correct behaviour; asking anyway only fills the console.
+  if (!audio) return;
+
+  try {
     if (audio.state === 'suspended') audio.resume();
 
     // Descending fourth, the way a cabin call sounds.

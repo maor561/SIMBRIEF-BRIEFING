@@ -301,12 +301,6 @@ function scheduleBand(model, timeline) {
         <path class="sched-curve" d="${path}"/>
       </svg>
       <span class="sched-duration ltr">${fmtDuration(times.estTimeEnroute ?? times.estBlock)}</span>
-      <div class="sched-facts">
-        ${fact(t('sum.blockFuel'), `${fmtNumber(model.fuel.planRamp)} ${units}`)}
-        ${fact(t('ov.groundDistance'), `${fmtNumber(model.route.distance)} nm`)}
-        ${fact(t('dep.cruiseAlt'), cruiseAlt ? `FL${Math.round(cruiseAlt / 100)}` : '—')}
-        ${fact(t('dep.pax'), paxFigure(model))}
-      </div>
       ${dots}
       <span class="sched-plane${plane.flying ? ' flying' : ''}${
         plane.flying || clock.started ? '' : ' parked'
@@ -314,6 +308,17 @@ function scheduleBand(model, timeline) {
     </div>
 
     <div class="sched-marks">${labels}</div>
+
+    <!-- Below the drawing, not inside it. The arch's flat top is 29% of the
+         graph's width, so four figures only ever fitted between the climb and
+         the descent on a wide desktop; at every other size they hung over both
+         curves and their knockout panel painted out the arch. -->
+    <div class="sched-facts">
+      ${fact(t('sum.blockFuel'), `${fmtNumber(model.fuel.planRamp)} ${units}`)}
+      ${fact(t('ov.groundDistance'), `${fmtNumber(model.route.distance)} nm`)}
+      ${fact(t('dep.cruiseAlt'), cruiseAlt ? `FL${Math.round(cruiseAlt / 100)}` : '—')}
+      ${fact(t('dep.pax'), paxFigure(model))}
+    </div>
     ${phaseChain(model, timeline)}
   </div>`;
 }
