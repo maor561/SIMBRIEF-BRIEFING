@@ -137,6 +137,7 @@ async function load({ username, demo = false } = {}) {
     // Opening the app mid-flight with a reading already owed should ask at
     // once, rather than on whichever second the freshness tick next lands.
     updateFuelPrompt();
+    keepAwake();
   } catch (err) {
     const key = err.code === 'no_ofp' ? 'err.no_ofp' : err.code === 'timeout' ? 'err.timeout' : 'err.generic';
     showError(`${t(key)}${err.message && err.code !== 'no_ofp' ? `\n${err.message}` : ''}`);
@@ -302,11 +303,19 @@ function refreshStaleFeeds() {
   }
 }
 
-setInterval(refreshStaleFeeds, FRESHNESS_TICK_MS);
+setInterval(() => {
+  refreshStaleFeeds();
+  // A lock refused earlier -- before the first tap, or by a device that was
+  // busy at the time -- is worth asking for again while the briefing is up.
+  keepAwake();
+}, FRESHNESS_TICK_MS);
 // Coming back to the tab is the moment the figures are about to be read, so
 // the age check runs then too rather than waiting for the next tick.
 document.addEventListener('visibilitychange', () => {
-  if (!document.hidden) refreshStaleFeeds();
+  if (document.hidden) return;
+  refreshStaleFeeds();
+  // The wake lock does not survive being hidden, so it is taken again here.
+  keepAwake();
 });
 
 /** Briefly swaps a button's label to confirm what just happened. */
@@ -808,8 +817,20 @@ function openAudio() {
   }
 }
 
+/*
+ * The first tap is what unlocks both of the things a browser will not grant
+ * to a page nobody has touched: an audio context, and on some devices the
+ * screen wake lock.
+ */
 ['pointerdown', 'keydown'].forEach((type) =>
-  addEventListener(type, openAudio, { once: true, passive: true })
+  addEventListener(
+    type,
+    () => {
+      openAudio();
+      keepAwake();
+    },
+    { once: true, passive: true }
+  )
 );
 
 function chime() {
@@ -968,6 +989,43 @@ function notify(due) {
 }
 
 setInterval(updateAlert, 5000);
+
+/* ------------------------------------------------------------ screen wake */
+
+/*
+ * Keeps the display on while a briefing is open.
+ *
+ * A tablet on a stand dims and locks after a couple of minutes of not being
+ * touched, which is exactly what a briefing does: it is read, not operated.
+ * Losing the screen mid-flight means unlocking the device to see the fuel
+ * check that just came due.
+ *
+ * The lock is released by the browser whenever the page is hidden, so it has
+ * to be taken again on every return rather than once at startup. Requests can
+ * also be refused until the page has been interacted with, which is why the
+ * first tap retries it.
+ *
+ * The trade-off is battery: a screen that never sleeps is the largest draw on
+ * a tablet. That is the instruction, and it is what a chart display does too.
+ */
+let wakeLock = null;
+
+async function keepAwake() {
+  if (!('wakeLock' in navigator) || document.hidden || el.app.hidden) return;
+  if (wakeLock) return;
+
+  try {
+    wakeLock = await navigator.wakeLock.request('screen');
+    // Dropped by the browser on hide, or when the device decides otherwise.
+    wakeLock.addEventListener('release', () => {
+      wakeLock = null;
+    });
+  } catch {
+    // Refused -- needs a gesture, or the device does not offer it. Retried on
+    // the next return to the page or the next tap.
+    wakeLock = null;
+  }
+}
 
 /* ------------------------------------------------------- install & alerts */
 
