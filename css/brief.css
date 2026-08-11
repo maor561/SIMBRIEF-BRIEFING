@@ -1239,70 +1239,95 @@ table.fuelcheck-table .dim { color: var(--dimmer); }
 /* ------------------------------------------------------------ fuel prompt */
 
 /*
- * Sits over the briefing rather than replacing it: the crew should be able to
- * read the screen behind while answering, and dismissing is one tap away.
- * Anchored bottom-inline-end so it stays clear of the rail and, on a tablet
- * held in two hands, lands near a thumb.
+ * Centred over the briefing and dimmed behind, so a reading that has come due
+ * is not something to notice but something to answer. It is never a trap:
+ * Later dismisses it, and so does Escape.
  */
 .prompt {
   position: fixed;
-  inset-block-end: 18px;
-  inset-inline-end: 18px;
+  inset: 0;
   z-index: 40;
-  max-width: min(360px, calc(100vw - 36px));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgb(3 12 18 / 0.62);
+  backdrop-filter: blur(2px);
+}
+
+.prompt[hidden] {
+  display: none;
 }
 
 .prompt-card {
-  padding: 13px 15px 14px;
+  width: min(460px, 100%);
+  padding: 26px 28px 24px;
   border: 1px solid var(--blue);
   border-radius: var(--radius);
   background: var(--panel);
-  box-shadow: 0 12px 32px rgb(0 0 0 / 0.45);
+  box-shadow: 0 24px 64px rgb(0 0 0 / 0.6);
+  text-align: center;
 }
 
 .prompt-head {
   display: flex;
-  align-items: baseline;
-  gap: 8px;
+  flex-direction: column;
+  gap: 6px;
 }
 
 .prompt-why {
-  font-size: 9.5px;
+  font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.07em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--blue);
 }
 
+/* The fix is the question being asked, so it is the biggest thing here. */
 .prompt-head b {
   font-family: var(--mono);
-  font-size: 15px;
+  font-size: 34px;
   font-weight: 700;
+  line-height: 1;
   color: var(--text);
 }
 
 .prompt-plan {
-  margin-block-start: 3px;
-  font-size: 11px;
+  margin-block-start: 10px;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
   color: var(--dimmer);
+}
+
+.prompt-plan span {
+  font-family: var(--mono);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--dim);
 }
 
 .prompt-row {
   display: flex;
   align-items: center;
-  gap: 7px;
-  margin-block-start: 10px;
+  gap: 9px;
+  margin-block-start: 18px;
 }
 
 .prompt-row .fuel-input {
   flex: 1;
   min-width: 0;
+  height: 52px;
+  font-size: 24px;
+  text-align: center;
 }
 
 .prompt-row .phase-btn {
-  align-self: auto;
+  align-self: stretch;
   flex: none;
-  padding: 7px 11px;
+  margin: 0;
+  padding: 0 16px;
+  font-size: 11px;
 }
 
 /* -------------------------------------------------- fuel check, in flight */

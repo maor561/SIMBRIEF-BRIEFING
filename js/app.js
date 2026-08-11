@@ -131,6 +131,9 @@ async function load({ username, demo = false } = {}) {
     el.overlay.hidden = true;
     el.app.hidden = false;
     render();
+    // Opening the app mid-flight with a reading already owed should ask at
+    // once, rather than on whichever second the freshness tick next lands.
+    updateFuelPrompt();
   } catch (err) {
     const key = err.code === 'no_ofp' ? 'err.no_ofp' : err.code === 'timeout' ? 'err.timeout' : 'err.generic';
     showError(`${t(key)}${err.message && err.code !== 'no_ofp' ? `\n${err.message}` : ''}`);
@@ -379,6 +382,14 @@ el.form.addEventListener('submit', (event) => {
 el.demo.addEventListener('click', () => load({ demo: true }));
 
 document.addEventListener('click', (event) => {
+  // Tapping the dimmed area around the prompt puts it off, the way any
+  // centred dialog behaves.
+  if (event.target.id === 'fuel-prompt') {
+    dismissedPrompts.add(event.target.dataset.fixIndex);
+    updateFuelPrompt();
+    return;
+  }
+
   const trigger = event.target.closest('[data-action]');
   if (!trigger) return;
 
@@ -656,6 +667,25 @@ el.content.addEventListener('touchend', (event) => {
 
 document.addEventListener('keydown', (event) => {
   if (el.app.hidden) return;
+
+  // The prompt is centred and dimmed behind, so it has to be dismissible from
+  // the keyboard as well as by tapping -- a modal with no way out is the one
+  // thing it must never become. Enter logs, Escape puts it off.
+  const prompt = document.getElementById('fuel-prompt');
+  if (prompt && !prompt.hidden) {
+    if (event.key === 'Escape') {
+      dismissedPrompts.add(prompt.dataset.fixIndex);
+      updateFuelPrompt();
+      event.preventDefault();
+      return;
+    }
+    if (event.key === 'Enter') {
+      prompt.querySelector('[data-action="prompt-save"]')?.click();
+      event.preventDefault();
+      return;
+    }
+  }
+
   if (event.target.matches('input, textarea')) return;
   const index = CHAPTERS.findIndex((c) => c.id === state.chapter);
   if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') {
@@ -696,6 +726,52 @@ setInterval(() => {
  */
 const dismissedPrompts = new Set();
 
+/*
+ * The two-tone cabin chime, synthesised rather than loaded.
+ *
+ * A sound file would be one more thing to fetch, cache and have go missing
+ * offline -- which is exactly the situation this app is built for. Two sine
+ * tones with a soft envelope cost nothing and always work.
+ *
+ * The context is created on first use because a browser will not start one
+ * before the page has been interacted with, and everything here is wrapped:
+ * a device with audio blocked or unavailable still gets the prompt, just
+ * silently.
+ */
+let audio = null;
+
+function chime() {
+  try {
+    audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+    if (audio.state === 'suspended') audio.resume();
+
+    // Descending fourth, the way a cabin call sounds.
+    [
+      { hz: 1046.5, at: 0 },
+      { hz: 784, at: 0.26 }
+    ].forEach(({ hz, at }) => {
+      const start = audio.currentTime + at;
+      const osc = audio.createOscillator();
+      const gain = audio.createGain();
+
+      osc.type = 'sine';
+      osc.frequency.value = hz;
+
+      // Struck, then allowed to ring down -- a square-edged tone reads as an
+      // error sound, which this is not.
+      gain.gain.setValueAtTime(0.0001, start);
+      gain.gain.exponentialRampToValueAtTime(0.22, start + 0.015);
+      gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.45);
+
+      osc.connect(gain).connect(audio.destination);
+      osc.start(start);
+      osc.stop(start + 0.5);
+    });
+  } catch {
+    /* no audio on this device; the prompt still shows */
+  }
+}
+
 function updateFuelPrompt() {
   const node = document.getElementById('fuel-prompt');
   if (!node || !state.model) return;
@@ -719,6 +795,7 @@ function updateFuelPrompt() {
   node.hidden = false;
   node.innerHTML = fuelPromptMarkup(state.model, due);
   node.querySelector('input')?.focus();
+  chime();
 }
 
 function fuelPromptMarkup(model, due) {
