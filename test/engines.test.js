@@ -29,6 +29,7 @@ import {
 import { runwayWind } from '../js/wind.js';
 import { notamKey, isRead, markRead, markUnread, unreadCount } from '../js/notamlog.js';
 import {
+  PHASES,
   getTimeline,
   startPhase,
   completePhase,
@@ -533,23 +534,25 @@ function withStorage(run) {
   }
 }
 
-check('walks the turnaround forward one phase at a time', () => {
+check('tracks the two spans that anchor the clock, and nothing else', () => {
+  assert.deepEqual(PHASES.map((p) => p.key), ['takeoff', 'landing']);
+
   withStorage(() => {
-    assert.equal(phaseState(getTimeline(model), 'fuelling'), 'pending');
+    assert.equal(phaseState(getTimeline(model), 'takeoff'), 'pending');
 
-    startPhase(model, 'fuelling', 1000);
-    assert.equal(phaseState(getTimeline(model), 'fuelling'), 'running');
+    startPhase(model, 'takeoff', 1000);
+    assert.equal(phaseState(getTimeline(model), 'takeoff'), 'running');
 
-    // Closing one opens the next, so the chain does not need driving twice.
-    const after = completePhase(model, 'fuelling', 2000);
-    assert.equal(phaseState(after, 'fuelling'), 'done');
-    assert.equal(phaseState(after, 'catering'), 'running');
-    assert.equal(after.current, 'catering');
+    // Wheels up opens the flight span, so it does not need starting by hand.
+    const after = completePhase(model, 'takeoff', 2000);
+    assert.equal(phaseState(after, 'takeoff'), 'done');
+    assert.equal(phaseState(after, 'landing'), 'running');
+    assert.equal(after.current, 'landing');
 
-    // And a mis-tap can be taken back, along with the phase it opened.
-    const reopened = reopenPhase(model, 'fuelling');
-    assert.equal(phaseState(reopened, 'fuelling'), 'running');
-    assert.equal(phaseState(reopened, 'catering'), 'pending');
+    // And a mis-tap can be taken back, along with the span it opened.
+    const reopened = reopenPhase(model, 'takeoff');
+    assert.equal(phaseState(reopened, 'takeoff'), 'running');
+    assert.equal(phaseState(reopened, 'landing'), 'pending');
   });
 });
 

@@ -21,22 +21,20 @@
 const STORE_KEY = 'sbb.timeline';
 
 /**
- * The turnaround in order. Ground handling first, then the two phases that
- * carry a real anchor into the OFP's clock.
+ * The two spans that carry a real anchor into the OFP's clock.
  *
- * `duration` is only used to sketch the ground phases before they have run;
- * once a phase starts its timer, the elapsed time is what shows. The flight
- * phases take their expected length from the plan instead of a constant.
+ * Nothing else is tracked. Ground handling has no bearing on any figure in
+ * the briefing -- knowing how long boarding took changes no fuel number and
+ * no waypoint time -- so timing it would be bookkeeping for its own sake.
+ * These two do: one stamps wheels-up, which the whole clock is rebuilt from,
+ * and one stamps touchdown.
  */
 export const PHASES = [
-  { key: 'fuelling', labelKey: 'phase.fuelling', duration: 25 * 60 },
-  { key: 'catering', labelKey: 'phase.catering', duration: 20 * 60 },
-  { key: 'boarding', labelKey: 'phase.boarding', duration: 30 * 60 },
-  // Closing this one is the START the whole chain hangs from: wheels up.
+  // Runs from the moment the crew starts it until wheels leave the ground.
   { key: 'takeoff', labelKey: 'phase.takeoff', anchor: 'off' },
-  // Runs for the whole flight; closing it stamps touchdown.
-  { key: 'landing', labelKey: 'phase.landing', anchor: 'on' },
-  { key: 'deboarding', labelKey: 'phase.deboarding', duration: 15 * 60 }
+  // Opens automatically at wheels-up and runs the flight; closing it stamps
+  // touchdown.
+  { key: 'landing', labelKey: 'phase.landing', anchor: 'on' }
 ];
 
 export const PHASE_KEYS = PHASES.map((p) => p.key);

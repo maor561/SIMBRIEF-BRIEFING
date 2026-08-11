@@ -252,14 +252,13 @@ function phaseChain(model, timeline) {
 }
 
 /**
- * How long a phase should take. Ground handling carries a default; the two
- * flight phases take their length from the plan, which knows better than any
- * constant could.
+ * How long a span should take, taken from the plan rather than a constant:
+ * taxi out for the takeoff span, enroute time for the flight.
  */
 function expectedSeconds(model, phase) {
   if (phase.key === 'takeoff') return model.times.taxiOut || null;
   if (phase.key === 'landing') return model.times.estTimeEnroute || null;
-  return phase.duration || null;
+  return null;
 }
 
 function phaseButton(phase, state) {

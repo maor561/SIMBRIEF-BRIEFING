@@ -1346,9 +1346,13 @@ table.fuelcheck-table .dim { color: var(--dimmer); }
   border-block-start: 1px solid var(--line-solid);
 }
 
+/*
+ * Two spans, so they are sized rather than stretched: a pair of tiles spread
+ * across a 1,000px panel would read as a layout accident, not as a control.
+ */
 .phases {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(112px, 1fr));
+  display: flex;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
@@ -1361,6 +1365,8 @@ table.fuelcheck-table .dim { color: var(--dimmer); }
   display: flex;
   flex-direction: column;
   gap: 5px;
+  flex: 1 1 160px;
+  max-width: 260px;
   padding: 9px 10px 8px;
   border: 1px solid var(--line-solid);
   border-radius: var(--radius-sm);
