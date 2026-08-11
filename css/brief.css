@@ -1050,15 +1050,22 @@ table.fuelcheck-table .dim { color: var(--dimmer); }
 
 .sched { padding: 20px 22px 14px; }
 
+/*
+ * Three tracks with equal outer ones, so the callsign sits on the panel's
+ * centre line rather than wherever the departure airport's name happens to
+ * end. A flex row put it immediately after the origin, which read as though
+ * it belonged to that airport.
+ */
 .sched-top {
   direction: ltr;
-  display: flex;
-  align-items: flex-start;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: start;
   gap: 16px;
 }
 
 .sched-port { min-width: 0; }
-.sched-port.end { text-align: end; margin-inline-start: auto; }
+.sched-port.end { text-align: end; }
 
 .sched-port b {
   display: block;
@@ -1079,6 +1086,7 @@ table.fuelcheck-table .dim { color: var(--dimmer); }
 
 .sched-callsign {
   align-self: center;
+  text-align: center;
   font-size: 19px;
   font-weight: 600;
   color: var(--text);
