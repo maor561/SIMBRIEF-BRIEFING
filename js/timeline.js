@@ -210,6 +210,67 @@ export function fixEta(model, timeline, fix) {
   return off ? addSeconds(off instanceof Date ? off : new Date(off), fix.timeTotal) : null;
 }
 
+/* ---------------------------------------------------------------- alerts */
+
+/**
+ * The moments worth interrupting for, each with the time it happens at.
+ *
+ * Two kinds. Before departure they come from the plan: the scheduled and
+ * estimated off-blocks, and the estimated wheels-up. After takeoff they come
+ * from the rebased clock, and the one that matters is the top of descent --
+ * the point the aircraft stops being able to loiter over its options.
+ *
+ * Departure alerts stop once the aircraft is airborne: nobody needs telling
+ * about the estimated takeoff time after taking off.
+ */
+export function alertPoints(model, timeline) {
+  const off = actualOff(timeline);
+  const points = [];
+
+  if (!off) {
+    const { schedOut, estOut, estOff } = model.times;
+    if (schedOut) points.push({ key: 'std', at: schedOut, lead: 15 * 60 });
+    // Only worth its own alert when it differs from the scheduled time.
+    if (estOut && (!schedOut || Math.abs(estOut - schedOut) > 60)) {
+      points.push({ key: 'etd', at: estOut, lead: 10 * 60 });
+    }
+    if (estOff) points.push({ key: 'etot', at: estOff, lead: 10 * 60 });
+    return points;
+  }
+
+  const descent = model.navlog.find((f) => f.stage === 'DSC' || f.stage === 'DES');
+  if (descent && Number.isFinite(descent.timeTotal)) {
+    points.push({
+      key: 'tod',
+      at: new Date(off.getTime() + descent.timeTotal * 1000),
+      lead: 10 * 60,
+      fix: descent
+    });
+  }
+
+  return points;
+}
+
+/**
+ * The alert that is due but has not been shown yet.
+ *
+ * "Due" means inside its lead time and not yet past -- an alert for a moment
+ * that has already gone by is noise, so each one expires two minutes after its
+ * time rather than waiting to be acknowledged.
+ */
+export function dueAlert(model, timeline, seen = new Set(), now = Date.now()) {
+  for (const point of alertPoints(model, timeline)) {
+    const at = point.at instanceof Date ? point.at.getTime() : new Date(point.at).getTime();
+    if (!Number.isFinite(at) || seen.has(point.key)) continue;
+
+    const secondsAway = Math.round((at - now) / 1000);
+    if (secondsAway <= point.lead && secondsAway > -120) {
+      return { ...point, at: new Date(at), secondsAway };
+    }
+  }
+  return null;
+}
+
 /* ------------------------------------------------------- prompt cadence */
 
 const MODE_KEY = 'sbb.fuelPromptMode';
@@ -308,6 +369,62 @@ export function dueCheckpoint(model, timeline, actuals, now = Date.now(), mode =
 
   // Oldest unanswered first: falling behind should not skip the earlier one.
   return reached.find(({ fix }) => !Number.isFinite(actuals[fix.index])) || null;
+}
+
+/**
+ * What a diversion would leave in the tanks, decided from where the aircraft
+ * actually is.
+ *
+ * The alternate's burn and the final reserve are both in the plan; what is
+ * missing in the air is the fuel on board *now*. That comes from the last
+ * logged reading when there is one, and from the plan at the current position
+ * when there is not -- and which of the two it used is reported, because a
+ * figure derived from the plan is a prediction, not a measurement.
+ *
+ * The margin is what is left after landing at the alternate with the reserve
+ * still intact. Once it goes negative the diversion no longer closes, which is
+ * the moment worth seeing coming.
+ */
+export function diversionNow(model, timeline, actuals = {}, now = Date.now()) {
+  const alternate = model.alternates[0];
+  if (!alternate || !Number.isFinite(alternate.burn)) return null;
+
+  const reserve = model.fuel.reserve ?? 0;
+  const required = alternate.burn + reserve;
+
+  const logged = model.navlog.filter((f) => Number.isFinite(actuals[f.index]));
+  const leg = currentLeg(model, timeline, now);
+
+  let onBoard = null;
+  let source = null;
+
+  if (logged.length) {
+    onBoard = actuals[logged[logged.length - 1].index];
+    source = 'logged';
+  } else if (leg?.passed && Number.isFinite(leg.passed.fuelOnBoard)) {
+    onBoard = leg.passed.fuelOnBoard;
+    source = 'planned';
+  } else if (Number.isFinite(model.fuel.planTakeoff)) {
+    onBoard = model.fuel.planTakeoff;
+    source = 'planned';
+  }
+
+  if (!Number.isFinite(onBoard)) return null;
+
+  return {
+    icao: alternate.icao,
+    distance: alternate.distance,
+    burn: alternate.burn,
+    reserve,
+    required,
+    onBoard,
+    source,
+    // What would remain on the ground at the alternate.
+    landingWith: onBoard - alternate.burn,
+    // What is left over and above the reserve.
+    margin: onBoard - required,
+    viable: onBoard - required >= 0
+  };
 }
 
 /**

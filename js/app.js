@@ -28,7 +28,8 @@ import {
   resetTimeline,
   phaseElapsed,
   dueCheckpoint,
-  setPromptMode
+  setPromptMode,
+  dueAlert
 } from './timeline.js';
 
 const STORAGE_USER = 'sbb.username';
@@ -199,11 +200,32 @@ function renderRail() {
     <div class="rail-foot">
       ${state.demo ? `<span class="demo-flag">${escapeHtml(t('header.demo'))}</span>` : ''}
       <span class="clock" id="clock">${escapeHtml(fmtZulu(new Date()))}</span>
+      ${alertsButton()}
+      ${installButton()}
       <button class="rail-btn" data-action="refresh" title="${escapeHtml(t('header.refresh'))}" aria-label="${escapeHtml(t('header.refresh'))}">
         <svg class="glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.4-5.7M20 4v4h-4"/></svg>
       </button>
     </div>
   `;
+}
+
+/** Offered only while there is something to grant; hidden once granted. */
+function alertsButton() {
+  if (!('Notification' in window) || Notification.permission !== 'default') return '';
+  const label = escapeHtml(t('alert.enable'));
+  return `<button class="rail-btn" data-action="enable-alerts" title="${label}" aria-label="${label}">
+    <svg class="glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 15v-4a6 6 0 1 0-12 0v4l-1.6 2.4h15.2zM10 20h4"/></svg>
+  </button>`;
+}
+
+/** Hidden once the app is installed, or where installing is not on offer. */
+function installButton() {
+  const state = installState();
+  if (state === 'installed' || state === 'unavailable') return '';
+  const label = escapeHtml(t('install.add'));
+  return `<button class="rail-btn" data-action="install-app" title="${label}" aria-label="${label}">
+    <svg class="glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11m0 0 4-4m-4 4-4-4M5 19h14"/></svg>
+  </button>`;
 }
 
 function renderChapter({ preserveScroll = false } = {}) {
@@ -537,6 +559,25 @@ document.addEventListener('click', (event) => {
       break;
     }
 
+    case 'alert-dismiss': {
+      const node = document.getElementById('alert');
+      if (node?.dataset.key) seenAlerts.add(node.dataset.key);
+      node.hidden = true;
+      node.innerHTML = '';
+      delete node.dataset.key;
+      break;
+    }
+
+    // Turning alerts on has to happen inside a tap: browsers refuse a
+    // permission request that did not come from one.
+    case 'enable-alerts':
+      requestAlerts(trigger);
+      break;
+
+    case 'install-app':
+      runInstall(trigger);
+      break;
+
     case 'clear-fuel-log':
       clearActuals(state.model);
       renderChapter({ preserveScroll: true });
@@ -853,6 +894,122 @@ function fuelPromptMarkup(model, due) {
 }
 
 setInterval(updateFuelPrompt, 5000);
+
+/* --------------------------------------------------------- milestone alerts */
+
+/**
+ * A banner for the moments worth interrupting for -- off-blocks, wheels-up,
+ * top of descent.
+ *
+ * A banner rather than the centred dialog the fuel prompt uses: these carry no
+ * question, so blocking the screen for them would be rude. They are dismissed
+ * by tapping, and never raised twice for the same milestone.
+ */
+const seenAlerts = new Set();
+
+function updateAlert() {
+  const node = document.getElementById('alert');
+  if (!node || !state.model) return;
+
+  const due = dueAlert(state.model, state.timeline, seenAlerts);
+  if (!due) return;
+  if (node.dataset.key === due.key) return;
+
+  node.dataset.key = due.key;
+  node.hidden = false;
+  node.innerHTML = alertMarkup(due);
+  chime();
+  notify(due);
+}
+
+function alertMarkup(due) {
+  const away = due.secondsAway;
+  const when =
+    away > 60
+      ? `${t('alert.in')} ${fmtDuration(away)}`
+      : away > -60
+      ? t('alert.now')
+      : t('alert.passed');
+
+  return `<div class="alert-card">
+    <span class="alert-key">${escapeHtml(t(`alert.${due.key}`))}</span>
+    <span class="alert-when">${escapeHtml(when)}</span>
+    <b class="ltr">${escapeHtml(fmtZulu(due.at))}</b>
+    ${due.fix ? `<span class="alert-fix ltr">${escapeHtml(due.fix.ident)}</span>` : ''}
+    <button class="alert-close" data-action="alert-dismiss" aria-label="${escapeHtml(t('common.close'))}">✕</button>
+  </div>`;
+}
+
+/**
+ * Mirrors an alert to the system notification tray.
+ *
+ * Only reaches the crew while the app is running -- a page that has been
+ * closed cannot raise anything without a push server behind it. Silent when
+ * permission was never granted, which is the default.
+ */
+function notify(due) {
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  try {
+    navigator.serviceWorker?.ready.then((reg) =>
+      reg.showNotification(`${t(`alert.${due.key}`)} · ${fmtZulu(due.at)}`, {
+        body: `${state.model.flight.callsign || ''} ${state.model.origin?.icao || ''} → ${state.model.destination?.icao || ''}`.trim(),
+        icon: 'icons/icon.svg',
+        badge: 'icons/icon.svg',
+        tag: `sbb-${due.key}`
+      })
+    );
+  } catch {
+    /* notifications unavailable; the banner still shows */
+  }
+}
+
+setInterval(updateAlert, 5000);
+
+/* ------------------------------------------------------- install & alerts */
+
+/*
+ * Chrome and Android offer to install through an event the page has to catch
+ * and hold onto; iOS has no such event and needs the crew to use Share ▸ Add
+ * to Home Screen themselves. The button reflects whichever case applies rather
+ * than promising something the device cannot do.
+ */
+let installPrompt = null;
+
+addEventListener('beforeinstallprompt', (event) => {
+  event.preventDefault();
+  installPrompt = event;
+  renderRail();
+});
+
+function installState() {
+  const standalone =
+    matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+  if (standalone) return 'installed';
+  if (installPrompt) return 'available';
+  // No event and not installed: iOS, where it is a manual gesture.
+  return /iphone|ipad|ipod/i.test(navigator.userAgent) ? 'manual' : 'unavailable';
+}
+
+async function runInstall(trigger) {
+  if (!installPrompt) {
+    flash(trigger, t('install.manual'));
+    return;
+  }
+  installPrompt.prompt();
+  await installPrompt.userChoice;
+  installPrompt = null;
+  renderRail();
+}
+
+async function requestAlerts(trigger) {
+  if (!('Notification' in window)) {
+    flash(trigger, t('alert.unsupported'));
+    return;
+  }
+  const result = await Notification.requestPermission();
+  flash(trigger, result === 'granted' ? t('alert.on') : t('alert.off'));
+  renderRail();
+}
 
 // Rotating the iPad (or resizing a dev window) can cross the two-column
 // threshold; re-run the full chapter render so masonry rebalances from a

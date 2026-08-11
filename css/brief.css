@@ -1541,6 +1541,154 @@ table.fuelcheck-table .dim { color: var(--dimmer); }
   color: var(--dim);
 }
 
+/* ------------------------------------------------------- milestone alerts */
+
+/*
+ * A banner, not a dialog. These carry no question -- the crew is being told
+ * something, not asked -- so blocking the screen for them would be rude.
+ * Anchored top-centre, clear of the rail in either orientation.
+ */
+.alert {
+  position: fixed;
+  inset-block-start: 14px;
+  inset-inline: 0;
+  z-index: 45;
+  display: flex;
+  justify-content: center;
+  padding-inline: 16px;
+  pointer-events: none;
+}
+
+.alert[hidden] {
+  display: none;
+}
+
+.alert-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: 100%;
+  padding: 11px 12px 11px 16px;
+  border: 1px solid var(--blue);
+  border-radius: 999px;
+  background: var(--panel);
+  box-shadow: 0 12px 32px rgb(0 0 0 / 0.5);
+  pointer-events: auto;
+}
+
+.alert-key {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--blue);
+  white-space: nowrap;
+}
+
+.alert-when {
+  font-size: 11px;
+  color: var(--dimmer);
+  white-space: nowrap;
+}
+
+.alert-card b {
+  font-family: var(--mono);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.alert-fix {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--dim);
+}
+
+.alert-close {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--panel-2);
+  color: var(--dim);
+  font-size: 12px;
+  line-height: 1;
+}
+
+/* ------------------------------------------------------------- divert now */
+
+/*
+ * The arithmetic a crew would otherwise do on a knee-board: what is on board
+ * against what the alternate costs. Bordered on the inline start so the
+ * verdict reads before any of the figures do.
+ */
+.divert {
+  margin: 4px 15px 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--line-solid);
+  border-inline-start: 3px solid var(--dim);
+  border-radius: var(--radius-sm);
+  background: var(--panel-2);
+}
+
+.divert.good { border-inline-start-color: var(--green); }
+.divert.warn { border-inline-start-color: var(--amber); }
+.divert.bad { border-inline-start-color: var(--red); }
+
+.divert-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-block-end: 10px;
+}
+
+.divert-head .k {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--text);
+}
+
+.divert-head .src {
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--dimmer);
+}
+
+.divert-figs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px 18px;
+}
+
+.divert-figs .k {
+  display: block;
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--dimmer);
+}
+
+.divert-figs b {
+  display: block;
+  margin-block-start: 4px;
+  font-family: var(--mono);
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.divert-figs b.good { color: var(--green); }
+.divert-figs b.warn { color: var(--amber); }
+.divert-figs b.bad { color: var(--red); }
+
+.perf-wind-figs .v.plan { color: var(--dimmer); }
+
 /* ------------------------------------------------------------ fuel prompt */
 
 /*

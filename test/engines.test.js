@@ -42,7 +42,10 @@ import {
   fixEta,
   currentLeg,
   fuelCheckpoints,
-  dueCheckpoint
+  dueCheckpoint,
+  diversionNow,
+  alertPoints,
+  dueAlert
 } from '../js/timeline.js';
 
 const fixturePath = fileURLToPath(new URL('./fixture.json', import.meta.url));
@@ -682,6 +685,56 @@ check('reports a delay only when the two times are the same flight', () => {
   // An OFP flown the next evening is not a twenty-hour delay; say nothing.
   assert.equal(clockDelta(new Date(Date.UTC(2026, 2, 12, 18, 30)), planned), null);
   assert.equal(clockDelta(null, planned), null);
+});
+
+check('works out whether a diversion still closes from here', () => {
+  const off = Date.UTC(2026, 2, 11, 19, 0, 0);
+  const timeline = { phases: { takeoff: { at: off } } };
+  const altn = model.alternates[0];
+  const reserve = model.fuel.reserve;
+
+  // With a logged reading, the figure is measured.
+  const logged = diversionNow(model, timeline, { 27: 3100 }, off + 3600 * 1000);
+  assert.equal(logged.source, 'logged');
+  assert.equal(logged.onBoard, 3100);
+  assert.equal(logged.landingWith, 3100 - altn.burn);
+  assert.equal(logged.margin, 3100 - altn.burn - reserve);
+  assert.equal(logged.viable, true);
+
+  // Without one it falls back to the plan, and says so.
+  assert.equal(diversionNow(model, timeline, {}, off + 3600 * 1000).source, 'planned');
+
+  // Not enough to reach the alternate and keep the reserve.
+  const short = diversionNow(model, timeline, { 27: 2000 }, off + 3600 * 1000);
+  assert.equal(short.viable, false);
+  assert.equal(short.margin < 0, true);
+});
+
+check('raises the milestones worth interrupting for', () => {
+  // Before takeoff the alerts come from the plan.
+  const planned = alertPoints(model, { phases: {} }).map((p) => p.key);
+  assert.equal(planned.includes('std'), true);
+  assert.equal(planned.includes('etot'), true);
+  assert.equal(planned.includes('tod'), false, 'no descent to warn about on the ground');
+
+  // Airborne, the only one left is the top of descent, on the real clock.
+  const off = Date.UTC(2026, 2, 11, 19, 0, 0);
+  const timeline = { phases: { takeoff: { at: off } } };
+  const flying = alertPoints(model, timeline);
+  assert.deepEqual(flying.map((p) => p.key), ['tod']);
+
+  const tod = flying[0];
+  const descent = model.navlog.find((f) => f.stage === 'DSC' || f.stage === 'DES');
+  assert.equal(tod.at.getTime(), off + descent.timeTotal * 1000);
+
+  // Due inside its lead time, not before, and not long after.
+  const at = tod.at.getTime();
+  assert.equal(dueAlert(model, timeline, new Set(), at - 20 * 60 * 1000), null, 'too early');
+  assert.equal(dueAlert(model, timeline, new Set(), at - 5 * 60 * 1000)?.key, 'tod');
+  assert.equal(dueAlert(model, timeline, new Set(), at + 10 * 60 * 1000), null, 'stale');
+
+  // And never twice.
+  assert.equal(dueAlert(model, timeline, new Set(['tod']), at - 5 * 60 * 1000), null);
 });
 
 check('can be told to ask at every fix instead', () => {

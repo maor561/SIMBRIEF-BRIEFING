@@ -41,7 +41,11 @@ export default function renderPerformance({ model, liveMetar }) {
           : ''
       })}
 
-      ${section(t('arr.title'), 'aircraft', landingSection(model, landing))}
+      ${section(
+        t('arr.title'),
+        'aircraft',
+        landingSection(model, landing, liveWind(model.destination, landingRunway(landing), liveMetar))
+      )}
     </div>
   `;
 }
@@ -85,7 +89,12 @@ function takeoffSection(model, tlr, runway, live) {
   `;
 }
 
-function landingSection(model, tlr) {
+/** The runway the landing figures were computed for. */
+function landingRunway(tlr) {
+  return tlr?.runways.find((r) => r.identifier === tlr.plannedRunway) || tlr?.runways[0] || null;
+}
+
+function landingSection(model, tlr, live) {
   return `
     ${airportHead(
       model.destination,
@@ -94,7 +103,7 @@ function landingSection(model, tlr) {
       tlr?.plannedRunway
     )}
     ${subHead(t('arr.landingPerf'))}
-    ${landingPerformanceBody(model)}
+    ${landingPerformanceBody(model, live)}
     ${
       tlr
         ? `${subHead(`${t('to.otherRunways')} (${Math.max(0, tlr.runways.length - 1)})`)}

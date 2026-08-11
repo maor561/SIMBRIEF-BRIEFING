@@ -14,6 +14,7 @@ import { t } from '../i18n.js';
 import { escapeHtml, fmtNumber, fmtDuration, fmtZulu } from '../decode.js';
 import { icon, section, findingsList } from '../ui.js';
 import { dominantCruiseAltitude } from '../charts.js';
+import { getActuals } from '../fuellog.js';
 import { SEVERITY } from '../analyze.js';
 import {
   PHASES,
@@ -22,7 +23,8 @@ import {
   phaseElapsed,
   rebasedTimes,
   actualOff,
-  actualOn
+  actualOn,
+  diversionNow
 } from '../timeline.js';
 
 export default function renderOverview({ model, findings, timeline }) {
@@ -46,7 +48,7 @@ export default function renderOverview({ model, findings, timeline }) {
       ${section(t('common.route'), 'routeSwap', routeBody(model))}
       ${
         model.alternates.length
-          ? section(t('ov.diversion'), 'airspace', diversionBody(model), {
+          ? section(t('ov.diversion'), 'airspace', diversionBody(model, timeline, getActuals(model)), {
               action: `<span class="sect-flag">${escapeHtml(model.alternates.map((a) => a.icao).join(' · '))}</span>`
             })
           : ''
@@ -505,8 +507,52 @@ function documentsSection(model) {
  * what routing. These are the figures the decision turns on, so they belong
  * on the cover rather than buried with the alternate's weather.
  */
-function diversionBody(model) {
+/**
+ * What diverting right now would cost, from the fuel actually on board.
+ *
+ * The plan already says what a diversion burns; what it cannot say is whether
+ * that still closes from where the aircraft is. This is the arithmetic a crew
+ * would otherwise do on a knee-board, and the number that decides whether the
+ * alternate is still an option.
+ */
+function divertNowPanel(now, units) {
+  if (!now) return '';
+
+  const tone = !now.viable ? 'bad' : now.margin < 400 ? 'warn' : 'good';
+  const sign = now.margin < 0 ? '−' : '+';
+
+  return `<div class="divert ${tone}">
+    <div class="divert-head">
+      <span class="k">${escapeHtml(t('ov.divertNow'))}</span>
+      <span class="src">${escapeHtml(
+        now.source === 'logged' ? t('ov.fromLog') : t('ov.fromPlan')
+      )}</span>
+    </div>
+    <div class="divert-figs">
+      <div>
+        <span class="k">${escapeHtml(t('ov.onBoard'))}</span>
+        <b class="ltr">${fmtNumber(now.onBoard)} ${units}</b>
+      </div>
+      <div>
+        <span class="k">${escapeHtml(t('ov.landWith'))} ${escapeHtml(now.icao)}</span>
+        <b class="ltr">${fmtNumber(now.landingWith)} ${units}</b>
+      </div>
+      <div>
+        <span class="k">${escapeHtml(t('ov.overReserve'))}</span>
+        <b class="ltr ${tone}">${sign}${fmtNumber(Math.abs(now.margin))} ${units}</b>
+      </div>
+    </div>
+    ${
+      now.viable
+        ? ''
+        : `<div class="atc-note bad">${escapeHtml(t('ov.divertShort'))}</div>`
+    }
+  </div>`;
+}
+
+function diversionBody(model, timeline, actuals) {
   const units = model.units === 'lbs' ? 'lb' : 'kg';
+  const now = diversionNow(model, timeline, actuals);
 
   return model.alternates
     .map((alternate, i) => {
@@ -527,6 +573,8 @@ function diversionBody(model) {
           ${fig(t('arr.altnBurn'), fmtNumber(alternate.burn), units)}
           ${fig(t('arr.altnCruise'), alternate.cruiseAltitude ? `FL${Math.round(alternate.cruiseAltitude / 100)}` : '—')}
         </div>
+
+        ${i === 0 ? divertNowPanel(now, units) : ''}
 
         <div class="sect-fields">
           ${field(t('common.runway'), alternate.plannedRunway)}

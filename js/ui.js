@@ -551,7 +551,7 @@ function stamp(value) {
  * the arrival chapter (full detail) and the descent chapter (reviewed ahead
  * of top of descent, before workload picks up).
  */
-export function landingPerformanceBody(model) {
+export function landingPerformanceBody(model, live = null) {
   const tlr = model.tlr.landing;
   if (!tlr) return `<div class="empty-state">${escapeHtml(t('common.notAvailable'))}</div>`;
 
@@ -597,19 +597,25 @@ export function landingPerformanceBody(model) {
 
     <div class="sect-pad">${runwayBar(runway, { showStop: false })}</div>
 
+    ${landingWindCompare(tlr, runway, live)}
+
     <div class="sect-fields">
-      ${field(
-        isTailwind ? t('to.tailwind') : t('to.headwind'),
-        Number.isFinite(runway.headwind)
-          ? `<span class="${isTailwind ? 'bad' : 'good'}">${Math.abs(runway.headwind)} kt</span>`
-          : '—'
-      )}
-      ${field(
-        t('to.crosswind'),
-        Number.isFinite(runway.crosswind)
-          ? `<span class="${crosswindTone}">${runway.crosswind} kt</span>`
-          : '—'
-      )}
+      ${
+        live
+          ? ''
+          : `${field(
+              isTailwind ? t('to.tailwind') : t('to.headwind'),
+              Number.isFinite(runway.headwind)
+                ? `<span class="${isTailwind ? 'bad' : 'good'}">${Math.abs(runway.headwind)} kt</span>`
+                : '—'
+            )}
+            ${field(
+              t('to.crosswind'),
+              Number.isFinite(runway.crosswind)
+                ? `<span class="${crosswindTone}">${runway.crosswind} kt</span>`
+                : '—'
+            )}`
+      }
       ${field(t('arr.gradient'), runway.gradient === null ? '—' : `${runway.gradient}%`)}
       ${field(t('common.temp'), tlr.temperature === null ? '—' : `${tlr.temperature}°C`)}
       ${field(t('arr.maxDry'), runway.maxWeightDry ? fmtWeight(runway.maxWeightDry, model.units) : '—')}
@@ -621,6 +627,100 @@ export function landingPerformanceBody(model) {
       ${meter({ label: t('arr.ldw'), value: tlr.plannedWeight ?? model.weights.estLdw, max: maxWeight, units: model.units })}
     </div>
   `;
+}
+
+/**
+ * The landing runway's wind, planned against the current observation.
+ *
+ * The same comparison the takeoff section makes, and for the same reason: the
+ * landing figures assume the wind the plan was built with, and by the time the
+ * aircraft is on approach that wind is hours old. A crosswind that has climbed
+ * past the limit is worth knowing in the descent, not on short final.
+ *
+ * Returns nothing when there is no live observation, so the block falls back
+ * to the planned figures alone rather than showing an empty comparison.
+ */
+function landingWindCompare(tlr, runway, live) {
+  if (!live) return '';
+
+  const senseOf = (component) =>
+    component < 0 ? t('to.tailShort') : t('to.headShort');
+
+  const cell = (value, tone, extra = '') =>
+    `<span class="v ltr ${tone}">${value}${extra}</span>`;
+
+  const plannedAlong = Number.isFinite(runway.headwind)
+    ? `${Math.abs(runway.headwind)} kt <i>${escapeHtml(senseOf(runway.headwind))}</i>`
+    : '—';
+
+  const liveAlong =
+    live.calm || live.variable
+      ? '—'
+      : `${Math.abs(live.headwind)} kt <i>${escapeHtml(senseOf(live.headwind))}</i>`;
+
+  const liveCross = live.calm || live.variable ? '—' : `${live.crosswind} kt`;
+  const worst = live.worstCrosswind;
+
+  return `<div class="perf-wind" style="padding-block:12px">
+    <div class="perf-wind-figs compare" style="flex:1">
+      <div class="perf-wind-row head">
+        <span class="k"></span>
+        <span class="v">${escapeHtml(t('common.planned'))}</span>
+        <span class="v">${escapeHtml(t('perf.now'))}</span>
+      </div>
+      <div class="perf-wind-row">
+        <span class="k">${escapeHtml(t('common.wind'))}</span>
+        ${cell(
+          Number.isFinite(tlr.windDir) && Number.isFinite(tlr.windSpd)
+            ? `${String(tlr.windDir).padStart(3, '0')}° / ${tlr.windSpd} kt`
+            : '—',
+          'plan'
+        )}
+        ${cell(live.calm ? 'CALM' : live.variable ? `VRB ${live.speed ?? '—'} kt` : `${String(live.direction).padStart(3, '0')}° / ${live.speed}${live.gustSpeed ? `G${live.gustSpeed}` : ''} kt`, 'live')}
+      </div>
+      <div class="perf-wind-row">
+        <span class="k">${escapeHtml(t('to.alongRunway'))}</span>
+        ${cell(plannedAlong, Number.isFinite(runway.headwind) && runway.headwind < 0 ? 'bad' : 'good')}
+        ${cell(liveAlong, `live ${live.worstTailwind > 0 ? 'bad' : 'good'}`)}
+      </div>
+      <div class="perf-wind-row">
+        <span class="k">${escapeHtml(t('to.crosswind'))}</span>
+        ${cell(Number.isFinite(runway.crosswind) ? `${runway.crosswind} kt` : '—', landingCrossTone(runway.crosswind))}
+        ${cell(liveCross, `live ${landingCrossTone(worst)}`, worst > live.crosswind ? ` <i>${worst} max</i>` : '')}
+      </div>
+    </div>
+  </div>
+  ${landingWindNote(runway, live)}`;
+}
+
+/** Landing crosswind bands: the 737's demonstrated figures. */
+function landingCrossTone(value) {
+  if (!Number.isFinite(value)) return '';
+  if (value >= 33) return 'bad';
+  if (value >= 25) return 'warn';
+  return 'good';
+}
+
+/** Says out loud when the approach has changed since it was planned. */
+function landingWindNote(runway, live) {
+  if (live.calm || live.variable) return '';
+  const notes = [];
+  const worst = live.worstCrosswind;
+
+  if (worst >= 33) {
+    notes.push({ tone: 'bad', text: `${t('perf.xwNow')} ${worst} kt — ${t('perf.xwOverLimit')} (33 kt).` });
+  } else if (worst >= 25 && runway.crosswind < 25) {
+    notes.push({ tone: 'warn', text: `${t('perf.xwRose')} ${runway.crosswind} → ${worst} kt.` });
+  }
+
+  if (runway.headwind > 0 && live.headwind < 0) {
+    notes.push({
+      tone: live.worstTailwind >= 10 ? 'bad' : 'warn',
+      text: `${t('perf.senseFlip')} ${runway.headwind} kt ${t('to.headShort')} → ${Math.abs(live.headwind)} kt ${t('to.tailShort')}.`
+    });
+  }
+
+  return notes.map((n) => `<div class="atc-note ${n.tone}">${escapeHtml(n.text)}</div>`).join('');
 }
 
 /* ------------------------------------------------------------------ runway */
