@@ -16,7 +16,9 @@
  * stored, so a failed fetch cannot poison the fallback with an error body.
  */
 
-const VERSION = 'v1';
+// Bumped because v1 could have redirected responses stored in it (see
+// cachePlain below) -- those must be evicted outright, not merged with.
+const VERSION = 'v2';
 const SHELL = `sbb-shell-${VERSION}`;
 const DATA = `sbb-data-${VERSION}`;
 
@@ -51,13 +53,48 @@ const SHELL_FILES = [
   './js/glossary.js'
 ];
 
+/**
+ * Stores a response with its redirect history stripped out.
+ *
+ * Vercel 308s a handful of paths to their canonical form (a bare directory to
+ * its index, a doubled slash, ...). `fetch` follows that transparently and
+ * hands back a `Response` flagged `redirected: true` -- fine to read once, but
+ * Chrome refuses to let a *cached copy* of that response satisfy a later
+ * `fetch` event, and fails the whole request instead: "a redirected response
+ * was used for a request whose redirect mode is not follow." `cache.add()`
+ * stores exactly that flagged response with no way to intervene, which is
+ * what put every shell file behind a redirect out of reach the moment the
+ * service worker tried to serve it from cache.
+ *
+ * Rebuilding a plain `Response` from the body before storing removes the
+ * flag, so what comes back out of the cache later is never a redirect
+ * replay -- just the bytes, which is all a cached copy ever needed to be.
+ */
+async function cachePlain(cache, request, response) {
+  const body = await response.blob();
+  const plain = new Response(body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers: response.headers
+  });
+  await cache.put(request, plain);
+}
+
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches
       .open(SHELL)
-      // One miss must not fail the whole install, so each file is added on
-      // its own and a failure is tolerated.
-      .then((cache) => Promise.all(SHELL_FILES.map((file) => cache.add(file).catch(() => {}))))
+      // One miss must not fail the whole install, so each file is fetched and
+      // stored on its own and a failure is tolerated.
+      .then((cache) =>
+        Promise.all(
+          SHELL_FILES.map((file) =>
+            fetch(file, { redirect: 'follow' })
+              .then((response) => (response.ok ? cachePlain(cache, file, response) : null))
+              .catch(() => {})
+          )
+        )
+      )
       .then(() => self.skipWaiting())
   );
 });
@@ -93,7 +130,7 @@ async function networkFirst(request) {
     // back as the "last known state" forever.
     if (response.ok) {
       const cache = await caches.open(DATA);
-      cache.put(request, response.clone());
+      cachePlain(cache, request, response.clone());
     }
     return response;
   } catch (err) {
@@ -118,7 +155,7 @@ async function staleWhileRevalidate(request, event) {
     .then(async (response) => {
       if (response.ok) {
         const cache = await caches.open(SHELL);
-        await cache.put(request, response.clone());
+        await cachePlain(cache, request, response.clone());
       }
       return response;
     })
