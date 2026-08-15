@@ -106,7 +106,46 @@ const WX_WORDS = {
   SM: 'Statute miles',
   FT: 'Feet',
   ALL: 'All',
-  RWY: 'Runway'
+  RWY: 'Runway',
+
+  // SIGMET phraseology (ICAO Annex 3 / Doc 4444). None of these collide with
+  // a METAR/TAF meaning, so they live in the same dictionary rather than a
+  // second one the caller would have to know to also consult.
+  SIGMET: 'Significant Meteorological Information',
+  VALID: 'Valid',
+  WI: 'Within',
+  OBS: 'Observed',
+  OBSC: 'Obscured',
+  EMBD: 'Embedded',
+  FCST: 'Forecast',
+  MOV: 'Moving',
+  STNR: 'Stationary',
+  INTSF: 'Intensifying',
+  WKN: 'Weakening',
+  NC: 'No change',
+  SEV: 'Severe',
+  MOD: 'Moderate',
+  TURB: 'Turbulence',
+  ICE: 'Icing',
+  ICG: 'Icing',
+  MTW: 'Mountain wave',
+  TC: 'Tropical cyclone',
+  APRX: 'Approximately',
+  ENTIRE: 'Entire',
+  OTLK: 'Outlook',
+  TOP: 'Top (of the phenomenon or cloud)',
+  ABV: 'Above',
+  BLW: 'Below',
+  BTN: 'Between',
+  ACT: 'Active',
+  N: 'North',
+  S: 'South',
+  E: 'East',
+  W: 'West',
+  NE: 'Northeast',
+  NW: 'Northwest',
+  SE: 'Southeast',
+  SW: 'Southwest'
 };
 
 /**
@@ -184,10 +223,20 @@ const WX_PATTERNS = [
     match: /^FM(\d{2})(\d{2})(\d{2})$/,
     decode: ([, day, hh, mm]) => `From day ${day}, ${hh}:${mm}Z`
   },
-  // TAF/period validity: 1006/1008 (day 10 06Z to day 10 08Z).
+  /*
+   * Validity window: 1006/1008. Genuinely ambiguous on the digits alone -- a
+   * TAF period is DDHH/DDHH (day-of-month, hour), a SIGMET's is HHMM/HHMM
+   * (hour, minute), and there is no numeric range that only one of those can
+   * produce. Decoding the wrong one would be worse than not decoding at all,
+   * so the caller says which vocabulary it is reading; METAR/TAF is the
+   * default since that is by far the more common source of this shape.
+   */
   {
     match: /^(\d{2})(\d{2})\/(\d{2})(\d{2})$/,
-    decode: ([, d1, h1, d2, h2]) => `Valid day ${d1} ${h1}:00Z to day ${d2} ${h2}:00Z`
+    decode: ([, a1, a2, b1, b2], context) =>
+      context === 'sigmet'
+        ? `Valid ${a1}:${a2}Z to ${b1}:${b2}Z`
+        : `Valid day ${a1} ${a2}:00Z to day ${b1} ${b2}:00Z`
   },
   // Probability: PROB30, PROB40.
   { match: /^PROB(\d{2})$/, decode: ([, pct]) => `${pct}% probability` },
@@ -220,15 +269,20 @@ function capitalize(text) {
  * Decodes one METAR/TAF/SIGMET token. Structural patterns are tried first
  * because they cover the tokens that actually carry the flight-relevant
  * numbers; the dictionary catches the fixed vocabulary around them.
+ *
+ * `context: 'sigmet'` only changes how the one genuinely ambiguous pattern
+ * (the validity window) is read; every other pattern and the dictionary mean
+ * the same thing regardless of which of the three sources the token came
+ * from.
  */
-export function decodeWxToken(token) {
+export function decodeWxToken(token, context) {
   const code = bare(token);
   if (!code) return null;
 
   for (const { match, decode } of WX_PATTERNS) {
     const hit = code.match(match);
     if (hit) {
-      const result = decode(hit);
+      const result = decode(hit, context);
       if (result) return result;
     }
   }
@@ -323,5 +377,6 @@ export function decodeNotamToken(token) {
 /** Single entry point the renderers use, so they do not need to know which
  *  dictionary a chapter's text belongs to beyond its own kind. */
 export function decodeToken(kind, token) {
-  return kind === 'notam' ? decodeNotamToken(token) : decodeWxToken(token);
+  if (kind === 'notam') return decodeNotamToken(token);
+  return decodeWxToken(token, kind === 'sigmet' ? 'sigmet' : undefined);
 }

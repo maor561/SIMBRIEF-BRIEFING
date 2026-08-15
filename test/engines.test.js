@@ -24,7 +24,8 @@ import {
   notamActiveDuring,
   screenEnrouteNotam,
   flightCategory,
-  categoryRank
+  categoryRank,
+  highlightWx
 } from '../js/decode.js';
 import { runwayWind } from '../js/wind.js';
 import { notamKey, isRead, markRead, markUnread, unreadCount } from '../js/notamlog.js';
@@ -919,6 +920,49 @@ check('decodes the NOTAM vocabulary', () => {
 check('routes to the right dictionary by kind', () => {
   assert.equal(decodeToken('wx', 'BKN008'), decodeWxToken('BKN008'));
   assert.equal(decodeToken('notam', 'TWY'), decodeNotamToken('TWY'));
+  assert.equal(decodeToken('sigmet', 'SEV'), decodeWxToken('SEV', 'sigmet'));
+});
+
+check('decodes SIGMET phraseology, sharing the METAR/TAF vocabulary it overlaps with', () => {
+  assert.equal(decodeWxToken('SEV', 'sigmet'), 'Severe');
+  assert.equal(decodeWxToken('TURB', 'sigmet'), 'Turbulence');
+  assert.equal(decodeWxToken('OBSC', 'sigmet'), 'Obscured');
+  assert.equal(decodeWxToken('EMBD', 'sigmet'), 'Embedded');
+  assert.equal(decodeWxToken('INTSF', 'sigmet'), 'Intensifying');
+  assert.equal(decodeWxToken('WKN', 'sigmet'), 'Weakening');
+  assert.equal(decodeWxToken('MOV', 'sigmet'), 'Moving');
+  assert.equal(decodeWxToken('N', 'sigmet'), 'North');
+
+  // The overlap: these mean the same thing with or without SIGMET context.
+  assert.equal(decodeWxToken('TS', 'sigmet'), decodeWxToken('TS'));
+  assert.equal(decodeWxToken('FZRA', 'sigmet'), decodeWxToken('FZRA'));
+  assert.equal(decodeWxToken('VA', 'sigmet'), decodeWxToken('VA'));
+});
+
+check('does not mistake an ordinary word for a hazard code it merely starts with', () => {
+  // VALID opens almost every SIGMET; a prefix match on VA (volcanic ash) had
+  // been flagging it red. SQ/FC/VA/SS/DS are standalone WMO codes, so the
+  // match now requires the token to end there too.
+  const rendered = highlightWx('VALID 1030/1430Z', 'sigmet');
+  assert.doesNotMatch(rendered, /wx-bad">VALID</, 'VALID must not render as a hazard token');
+  assert.match(rendered, /class="gl" data-gloss="sigmet" data-code="VALID"/, 'and it should still decode');
+
+  // The real codes it must not stop catching.
+  assert.match(highlightWx('+VA FZDZ'), /class="wx-bad[^"]*" data-gloss="wx" data-code="\+VA"/, 'heavy volcanic ash is still flagged');
+  assert.match(highlightWx('VCFC'), /class="wx-bad[^"]*" data-gloss="wx" data-code="VCFC"/, 'funnel cloud in the vicinity is still flagged');
+});
+
+check('reads the validity window by context, since the digits alone are ambiguous', () => {
+  // TAF: day 10, 06Z to day 10, 08Z. The default when no context is given.
+  assert.equal(decodeWxToken('1006/1008'), 'Valid day 10 06:00Z to day 10 08:00Z');
+
+  // The same digits in a SIGMET are a time-of-day window, not two different
+  // days -- 10:30 to 14:30, not "day 10" anything.
+  assert.equal(decodeWxToken('1030/1430', 'sigmet'), 'Valid 10:30Z to 14:30Z');
+
+  // And the two really do disagree on the same input, which is the whole
+  // reason this needs a context rather than one universal reading.
+  assert.notEqual(decodeWxToken('1030/1430'), decodeWxToken('1030/1430', 'sigmet'));
 });
 
 console.log(`\n${passed} passed, ${failed} failed\n`);

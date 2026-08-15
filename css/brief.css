@@ -621,15 +621,13 @@ table.navlog-table th { padding: 6px 8px; }
 }
 
 /*
- * A token that taps to a plain-English decode. The dotted underline in the
- * token's own colour works whether or not it also carries a hazard class --
- * it never has to compete with red or amber for attention, just add a hint
- * of "there is more here" to whatever is already shown.
+ * A token that taps to a plain-English decode. Bold rather than an underline:
+ * it reads clearly against the monospace body text at a glance, and a hazard
+ * token (wx-warn/wx-bad) is already bold, so this never has to compete with
+ * red or amber for attention -- it just confirms the same token is tappable.
  */
 .gl {
-  text-decoration: underline dotted;
-  text-decoration-color: currentColor;
-  text-underline-offset: 3px;
+  font-weight: 700;
   cursor: pointer;
 }
 

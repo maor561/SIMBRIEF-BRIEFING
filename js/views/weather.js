@@ -232,7 +232,7 @@ function sigmetBody(model) {
     .map(
       (s) => `<div style="margin-block-end:11px">
         ${s.fir ? chip(s.fir, 'blue') : ''}
-        <div class="wxrow-text" style="margin-block-start:6px">${highlightWx(s.text)}</div>
+        <div class="wxrow-text" style="margin-block-start:6px">${highlightWx(s.text, 'sigmet')}</div>
       </div>`
     )
     .join('')}</div>`;

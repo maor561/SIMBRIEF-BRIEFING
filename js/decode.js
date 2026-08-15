@@ -675,7 +675,15 @@ export function notamIconName(notam) {
  * than baked into the markup here, so there is exactly one place that knows
  * what any given code means.
  */
-export function highlightWx(raw) {
+/**
+ * `context: 'sigmet'` is passed for SIGMET bodies. The vocabulary is almost
+ * entirely shared with METAR/TAF -- TS, VA, FZ and the rest mean the same
+ * thing everywhere -- but the one validity-window pattern (`1030/1430`) is
+ * genuinely ambiguous between a TAF's day/hour and a SIGMET's hour/minute,
+ * so that one decode needs to know which vocabulary it is reading. See
+ * glossary.js for the detail.
+ */
+export function highlightWx(raw, context) {
   if (!raw) return '';
   return String(raw)
     .split(/(\s+)/)
@@ -684,12 +692,14 @@ export function highlightWx(raw) {
       const upper = token.toUpperCase();
       const cls = classifyWxToken(upper);
       const escaped = escapeHtml(token);
-      const gloss = decodeWxToken(upper);
+      const gloss = decodeWxToken(upper, context);
 
       if (!cls && !gloss) return escaped;
 
       const classes = [cls, gloss ? 'gl' : null].filter(Boolean).join(' ');
-      const attrs = gloss ? ` data-gloss="wx" data-code="${escapeHtml(upper)}"` : '';
+      const attrs = gloss
+        ? ` data-gloss="${context === 'sigmet' ? 'sigmet' : 'wx'}" data-code="${escapeHtml(upper)}"`
+        : '';
       return `<span class="${classes}"${attrs}>${escaped}</span>`;
     })
     .join('');
@@ -741,7 +751,12 @@ function classifyWxToken(token) {
   // severe phenomena (squall, funnel cloud, ash, sand/dust storm).
   if (/(FEW|SCT|BKN|OVC)\d{3}(CB|TCU)/.test(token) || token === 'CB' || token === 'TCU') return 'wx-bad';
   if (/^(\+|-|VC)?(TS|FZ)/.test(token)) return 'wx-bad';
-  if (/^(SQ|FC|VA|SS|DS)/.test(token)) return 'wx-bad';
+  // Anchored at the end too: SQ/FC/VA/SS/DS are standalone phenomena codes in
+  // the WMO table, never a descriptor that something else is appended to --
+  // unlike a prefix match, which also (wrongly) lit up on any ordinary English
+  // word that happens to start with one, most commonly "VALID" at the top of
+  // every SIGMET.
+  if (/^(\+|-|VC)?(SQ|FC|VA|SS|DS)$/.test(token)) return 'wx-bad';
   if (/^(\+|VC)?FG$/.test(token)) return 'wx-bad';
   if (/^\+/.test(token)) return 'wx-bad'; // any heavy (+) weather group
 
