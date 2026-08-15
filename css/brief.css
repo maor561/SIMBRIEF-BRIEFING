@@ -620,6 +620,19 @@ table.navlog-table th { padding: 6px 8px; }
   border-radius: 3px;
 }
 
+/*
+ * A token that taps to a plain-English decode. The dotted underline in the
+ * token's own colour works whether or not it also carries a hazard class --
+ * it never has to compete with red or amber for attention, just add a hint
+ * of "there is more here" to whatever is already shown.
+ */
+.gl {
+  text-decoration: underline dotted;
+  text-decoration-color: currentColor;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
 @media (max-width: 640px) {
   .wx-stats { gap: 12px; width: 100%; justify-content: space-between; }
 }
@@ -1539,6 +1552,59 @@ table.fuelcheck-table .dim { color: var(--dimmer); }
   font-size: 12px;
   font-weight: 600;
   color: var(--dim);
+}
+
+/* --------------------------------------------------------------- glossary */
+
+/*
+ * A tooltip, not a dialog. Positioned in JS to the exact spot under (or, when
+ * that would run off the screen, above) the tapped token, so it reads as an
+ * answer to that specific tap rather than as a panel that happened to open.
+ */
+.gloss-pop {
+  position: fixed;
+  z-index: 50;
+  max-width: min(280px, calc(100vw - 20px));
+  padding: 10px 26px 10px 12px;
+  border: 1px solid var(--blue);
+  border-radius: var(--radius-sm);
+  background: var(--panel);
+  box-shadow: 0 14px 32px rgb(0 0 0 / 0.5);
+}
+
+.gloss-pop[hidden] {
+  display: none;
+}
+
+.gloss-pop b {
+  display: block;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  color: var(--blue);
+}
+
+.gloss-pop span {
+  display: block;
+  margin-block-start: 4px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--text);
+}
+
+.gloss-close {
+  position: absolute;
+  inset-block-start: 7px;
+  inset-inline-end: 7px;
+  width: 18px;
+  height: 18px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--panel-2);
+  color: var(--dim);
+  font-size: 9px;
+  line-height: 1;
 }
 
 /* ------------------------------------------------------- milestone alerts */

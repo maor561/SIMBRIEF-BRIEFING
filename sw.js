@@ -46,7 +46,8 @@ const SHELL_FILES = [
   './js/views/report.js',
   './js/timeline.js',
   './js/notamlog.js',
-  './js/wind.js'
+  './js/wind.js',
+  './js/glossary.js'
 ];
 
 self.addEventListener('install', (event) => {

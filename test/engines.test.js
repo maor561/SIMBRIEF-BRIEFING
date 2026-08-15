@@ -28,6 +28,7 @@ import {
 } from '../js/decode.js';
 import { runwayWind } from '../js/wind.js';
 import { notamKey, isRead, markRead, markUnread, unreadCount } from '../js/notamlog.js';
+import { decodeWxToken, decodeNotamToken, decodeToken } from '../js/glossary.js';
 import { aircraftPoint } from '../js/views/overview.js';
 import { clockDelta } from '../js/views/report.js';
 import {
@@ -853,6 +854,71 @@ check('raises a finding when the live weather has moved off the plan', () => {
   // And none of it appears without the live feed.
   const planOnly = analyze(model).map((f) => f.title).join(' | ');
   assert.equal(/now downwind|deteriorated since planning/.test(planOnly), false);
+});
+
+/* ---------------------------------------------------------------- glossary */
+
+check('decodes wind, cloud and visibility groups structurally', () => {
+  assert.equal(decodeWxToken('09007KT'), 'From 090° at 7 kt');
+  assert.equal(decodeWxToken('27015G28KT'), 'From 270° at 15, gusting 28 kt');
+  assert.equal(decodeWxToken('VRB03KT'), 'Variable direction at 3 kt');
+  assert.equal(decodeWxToken('060V150'), 'Wind direction varies between 060° and 150°');
+
+  assert.equal(decodeWxToken('BKN012'), 'Broken cloud at 1,200 ft');
+  assert.equal(decodeWxToken('OVC004CB'), 'Overcast cloud at 400 ft, cumulonimbus');
+  assert.equal(decodeWxToken('VV002'), 'Vertical visibility (sky obscured) at 200 ft');
+
+  assert.equal(decodeWxToken('9999'), 'Visibility 10 km or more');
+  assert.equal(decodeWxToken('0400'), 'Visibility 400 m');
+  assert.equal(decodeWxToken('1/2SM'), 'Visibility 1/2 statute miles');
+});
+
+check('decodes weather phenomena left to right, worst first', () => {
+  assert.equal(decodeWxToken('TSRA'), 'Thunderstorm with rain');
+  assert.equal(decodeWxToken('-SHRA'), 'Light showers of rain');
+  assert.equal(decodeWxToken('+FZRA'), 'Heavy freezing rain');
+  assert.equal(decodeWxToken('BR'), 'Mist');
+  assert.equal(decodeWxToken('FG'), 'Fog');
+  assert.equal(decodeWxToken('VCSH'), 'In the vicinity: showers of');
+});
+
+check('decodes temperature, altimeter and time groups', () => {
+  assert.equal(decodeWxToken('18/12'), 'Temperature 18°C, dew point 12°C');
+  assert.equal(decodeWxToken('M03/M07'), 'Temperature -03°C, dew point -07°C');
+  assert.equal(decodeWxToken('Q1013'), 'QNH 1013 hPa');
+  assert.equal(decodeWxToken('A2992'), 'Altimeter 29.92 inHg');
+  assert.equal(decodeWxToken('101630Z'), 'Observed on day 10 at 16:30Z');
+  assert.equal(decodeWxToken('FM211800'), 'From day 21, 18:00Z');
+  assert.equal(decodeWxToken('PROB30'), '30% probability');
+});
+
+check('falls back to the fixed vocabulary, and to nothing when unrecognised', () => {
+  assert.match(decodeWxToken('CAVOK'), /visibility 10 km or more/i);
+  assert.equal(decodeWxToken('NOSIG'), 'No significant change expected in the next two hours');
+  assert.equal(decodeWxToken('TEMPO'), 'Temporary fluctuation expected for under an hour at a time');
+
+  // An ICAO station code and a fix name have no abbreviation to expand.
+  assert.equal(decodeWxToken('LEBL'), null);
+  assert.equal(decodeWxToken('TOSNU'), null);
+  assert.equal(decodeWxToken(''), null);
+  assert.equal(decodeWxToken(null), null);
+});
+
+check('decodes the NOTAM vocabulary', () => {
+  assert.equal(decodeNotamToken('RWY'), 'Runway');
+  assert.equal(decodeNotamToken('CLSD'), 'Closed');
+  assert.equal(decodeNotamToken('U/S'), 'Unserviceable (out of service)');
+  assert.equal(decodeNotamToken('WEF'), 'With effect from');
+  assert.equal(decodeNotamToken('PPR.'), 'Prior permission required', 'trailing punctuation is stripped');
+  assert.equal(decodeNotamToken('rwy'), 'Runway', 'case-insensitive');
+
+  // A NOTAM identifier, not an abbreviation.
+  assert.equal(decodeNotamToken('A1234/25'), null);
+});
+
+check('routes to the right dictionary by kind', () => {
+  assert.equal(decodeToken('wx', 'BKN008'), decodeWxToken('BKN008'));
+  assert.equal(decodeToken('notam', 'TWY'), decodeNotamToken('TWY'));
 });
 
 console.log(`\n${passed} passed, ${failed} failed\n`);

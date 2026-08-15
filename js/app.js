@@ -21,6 +21,7 @@ import renderAtc from './views/atc.js';
 import { buildFixDetail } from './charts.js';
 import { setActual, classify, clearActuals, getActuals } from './fuellog.js';
 import { markRead, markUnread } from './notamlog.js';
+import { decodeToken } from './glossary.js';
 import {
   getTimeline,
   stampPhase,
@@ -418,6 +419,19 @@ el.form.addEventListener('submit', (event) => {
 el.demo.addEventListener('click', () => load({ demo: true }));
 
 document.addEventListener('click', (event) => {
+  // A METAR/TAF/NOTAM token that decodes. Handled before anything else, and
+  // it swallows the click entirely -- a tap that opens the glossary should
+  // not also register as a tap on whatever the token happens to sit inside.
+  const token = event.target.closest('[data-gloss]');
+  if (token) {
+    toggleGlossary(token);
+    return;
+  }
+  // Any other tap closes an open glossary popover, including a tap on a rail
+  // item or another control -- it should not go on floating over content the
+  // reader has since moved past.
+  if (!event.target.closest('#glossary')) closeGlossary();
+
   // Tapping the dimmed area around the prompt puts it off, the way any
   // centred dialog behaves.
   if (event.target.id === 'fuel-prompt') {
@@ -580,6 +594,10 @@ document.addEventListener('click', (event) => {
       break;
     }
 
+    case 'glossary-close':
+      closeGlossary();
+      break;
+
     // Turning alerts on has to happen inside a tap: browsers refuse a
     // permission request that did not come from one.
     case 'enable-alerts':
@@ -727,6 +745,15 @@ el.content.addEventListener('touchend', (event) => {
 
 document.addEventListener('keydown', (event) => {
   if (el.app.hidden) return;
+
+  if (event.key === 'Escape') {
+    const glossary = document.getElementById('glossary');
+    if (glossary && !glossary.hidden) {
+      closeGlossary();
+      event.preventDefault();
+      return;
+    }
+  }
 
   // The prompt is centred and dimmed behind, so it has to be dismissible from
   // the keyboard as well as by tapping -- a modal with no way out is the one
@@ -919,6 +946,76 @@ function fuelPromptMarkup(model, due) {
 }
 
 setInterval(updateFuelPrompt, 5000);
+
+/* -------------------------------------------------------------- glossary */
+
+/**
+ * Tap-to-decode for METAR/TAF/NOTAM abbreviations.
+ *
+ * highlightWx/highlightNotam (decode.js) mark the tokens they recognise with
+ * `data-gloss` (which dictionary) and `data-code` (the bare code); nothing
+ * about the definition itself is in the markup. It is looked up fresh here
+ * from glossary.js, so there is exactly one place in the app that knows what
+ * any given code means.
+ *
+ * A tooltip, not a dialog: anchored to the tapped token rather than centred,
+ * and dismissed by almost anything -- another tap, Escape, scrolling, turning
+ * the device -- because it answers a passing question and has nothing to ask
+ * back.
+ */
+function toggleGlossary(token) {
+  const node = document.getElementById('glossary');
+  if (!node) return;
+
+  const code = token.dataset.code;
+
+  // Tapping the token that is already open closes it, the way a disclosure
+  // normally behaves.
+  if (!node.hidden && node.dataset.code === code) {
+    closeGlossary();
+    return;
+  }
+
+  const text = decodeToken(token.dataset.gloss, code);
+  if (!text) return;
+
+  node.dataset.code = code;
+  node.innerHTML = `
+    <b class="ltr">${escapeHtml(code)}</b>
+    <span>${escapeHtml(text)}</span>
+    <button class="gloss-close" data-action="glossary-close" aria-label="${escapeHtml(t('common.close'))}">✕</button>
+  `;
+  node.hidden = false;
+  positionGlossary(node, token);
+}
+
+/** Anchored under the token, flipped above it when there is no room below. */
+function positionGlossary(node, token) {
+  const rect = token.getBoundingClientRect();
+  const margin = 10;
+  const w = node.offsetWidth;
+  const h = node.offsetHeight;
+
+  const left = Math.max(margin, Math.min(rect.left + rect.width / 2 - w / 2, window.innerWidth - w - margin));
+  let top = rect.bottom + 8;
+  if (top + h > window.innerHeight - margin) top = rect.top - h - 8;
+
+  node.style.left = `${Math.round(left)}px`;
+  node.style.top = `${Math.round(Math.max(margin, top))}px`;
+}
+
+function closeGlossary() {
+  const node = document.getElementById('glossary');
+  if (!node || node.hidden) return;
+  node.hidden = true;
+  node.innerHTML = '';
+  delete node.dataset.code;
+}
+
+// Anchored to a token's on-screen position, so it cannot be left floating
+// over content that has since scrolled or reflowed out from under it.
+addEventListener('scroll', closeGlossary, { capture: true, passive: true });
+addEventListener('resize', closeGlossary, { passive: true });
 
 /* --------------------------------------------------------- milestone alerts */
 

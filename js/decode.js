@@ -7,6 +7,7 @@
  */
 
 import { t } from './i18n.js';
+import { decodeWxToken, decodeNotamToken } from './glossary.js';
 
 /* ------------------------------------------------------------------ format */
 
@@ -667,15 +668,29 @@ export function notamIconName(notam) {
  * visibility and the like jump out without anyone reading the whole string.
  * Red is "this changes the plan", amber is "this deserves a look".
  */
+/**
+ * Tokens that decode get `data-gloss="wx"` and their bare code in
+ * `data-code`, tapped to a definition by a click handler elsewhere -- the
+ * definition itself is looked up again at tap time from `glossary.js` rather
+ * than baked into the markup here, so there is exactly one place that knows
+ * what any given code means.
+ */
 export function highlightWx(raw) {
   if (!raw) return '';
   return String(raw)
     .split(/(\s+)/)
     .map((token) => {
       if (!token.trim()) return escapeHtml(token);
-      const cls = classifyWxToken(token.toUpperCase());
+      const upper = token.toUpperCase();
+      const cls = classifyWxToken(upper);
       const escaped = escapeHtml(token);
-      return cls ? `<span class="${cls}">${escaped}</span>` : escaped;
+      const gloss = decodeWxToken(upper);
+
+      if (!cls && !gloss) return escaped;
+
+      const classes = [cls, gloss ? 'gl' : null].filter(Boolean).join(' ');
+      const attrs = gloss ? ` data-gloss="wx" data-code="${escapeHtml(upper)}"` : '';
+      return `<span class="${classes}"${attrs}>${escaped}</span>`;
     })
     .join('');
 }
@@ -693,9 +708,14 @@ export function highlightNotam(raw) {
       if (!token.trim()) return escapeHtml(token);
       const bare = token.toUpperCase().replace(/[.,;:]+$/, '');
       const escaped = escapeHtml(token);
-      if (NOTAM_STATUS.has(bare)) return `<span class="wx-bad">${escaped}</span>`;
-      if (NOTAM_SUBJECT.has(bare)) return `<span class="wx-warn">${escaped}</span>`;
-      return escaped;
+      const gloss = decodeNotamToken(bare);
+      const cls = NOTAM_STATUS.has(bare) ? 'wx-bad' : NOTAM_SUBJECT.has(bare) ? 'wx-warn' : null;
+
+      if (!cls && !gloss) return escaped;
+
+      const classes = [cls, gloss ? 'gl' : null].filter(Boolean).join(' ');
+      const attrs = gloss ? ` data-gloss="notam" data-code="${escapeHtml(bare)}"` : '';
+      return `<span class="${classes}"${attrs}>${escaped}</span>`;
     })
     .join('');
 }
