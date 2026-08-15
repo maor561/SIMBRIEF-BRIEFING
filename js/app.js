@@ -1170,12 +1170,26 @@ async function requestAlerts(trigger) {
   renderRail();
 }
 
-// Rotating the iPad (or resizing a dev window) can cross the two-column
-// threshold; re-run the full chapter render so masonry rebalances from a
-// flat list rather than re-packing its own already-built row/column tree.
+/*
+ * Rotating the iPad (or resizing a dev window) can cross the two-column
+ * threshold; re-run the full chapter render so masonry rebalances from a flat
+ * list rather than re-packing its own already-built row/column tree.
+ *
+ * Gated on width alone, because the masonry breakpoint is a width -- see
+ * TWO_COL_MIN_WIDTH in masonry.js -- and a resize event fires for height-only
+ * changes too. On Android, focusing a text input shrinks the layout viewport
+ * to make room for the on-screen keyboard, which fires exactly that kind of
+ * resize; without this guard the debounced handler tore down and rebuilt the
+ * chapter underneath the input the crew had just tapped, so the freshly
+ * inserted (unfocused) replacement dropped focus and the keyboard closed
+ * itself half a second after opening. iOS does not fire a window resize for
+ * its keyboard, which is why this only ever showed up on Android.
+ */
 let resizeTimer = null;
+let lastWidth = innerWidth;
 addEventListener('resize', () => {
-  if (el.app.hidden) return;
+  if (el.app.hidden || innerWidth === lastWidth) return;
+  lastWidth = innerWidth;
   clearTimeout(resizeTimer);
   resizeTimer = setTimeout(() => renderChapter({ preserveScroll: true }), 150);
 });
