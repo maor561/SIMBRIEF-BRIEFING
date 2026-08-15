@@ -221,6 +221,7 @@ const STRINGS = {
   'alert.unsupported': 'Not supported',
 
   'install.add': 'Install as an app',
+  'manual.open': 'User manual',
   'install.manual': 'Use Share ▸ Add to Home Screen',
 
   'ov.toTakeoff': 'To takeoff',

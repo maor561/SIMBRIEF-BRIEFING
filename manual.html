@@ -1,0 +1,914 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#08202e">
+<title>User Manual · Flight Briefing</title>
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/icon.svg">
+<style>
+  :root {
+    --bg: #08202e;
+    --bg-2: #0a2836;
+    --panel: #0e3346;
+    --panel-2: #124055;
+    --panel-3: #17506a;
+    --line: #1c4a63;
+    --ink: #eaf4fa;
+    --dim: #8fb6cb;
+    --dimmer: #6592aa;
+    --accent: #56bde9;
+    --accent-dim: #2f7ea3;
+    --amber: #ffb02e;
+    --green: #3ad48a;
+    --red: #ff5c66;
+    --mono: ui-monospace, 'SF Mono', 'Cascadia Mono', 'Roboto Mono', Consolas, monospace;
+    --sans: system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--sans);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+
+  * { min-width: 0; }
+  ::selection { background: var(--accent); color: #06222f; }
+
+  .wrap { max-width: 900px; margin: 0 auto; padding: 0 clamp(16px, 4vw, 32px); }
+  .prose { max-width: 66ch; }
+
+  /* --------------------------------------------------------------- appbar */
+
+  .appbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px clamp(16px, 4vw, 32px);
+    border-bottom: 1px solid var(--line);
+    background: var(--bg-2);
+  }
+
+  .appbar a {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    color: var(--dim);
+    text-decoration: none;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 5px 10px 5px 6px;
+    border-radius: 999px;
+    border: 1px solid transparent;
+  }
+
+  .appbar a:hover, .appbar a:focus-visible { border-color: var(--line); color: var(--ink); }
+  .appbar a:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .appbar svg { width: 15px; height: 15px; flex: none; }
+
+  /* -------------------------------------------------------------- title */
+
+  .title-band {
+    border-bottom: 1px solid var(--line);
+    padding: clamp(28px, 5vw, 44px) 0 clamp(24px, 4vw, 32px);
+    background: linear-gradient(180deg, var(--bg-2), var(--bg));
+  }
+
+  .kicker {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+
+  .title-band h1 {
+    margin: 10px 0 0;
+    font-size: clamp(30px, 5vw, 44px);
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    text-wrap: balance;
+  }
+
+  .title-band p {
+    margin: 10px 0 0;
+    max-width: 62ch;
+    font-size: 15px;
+    color: var(--dim);
+  }
+
+  .title-meta {
+    display: flex;
+    gap: 18px;
+    flex-wrap: wrap;
+    margin-top: 18px;
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: var(--dimmer);
+  }
+
+  .title-meta b { color: var(--dim); font-weight: 600; }
+
+  /* ---------------------------------------------------------------- toc */
+
+  .toc {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    background: rgba(8, 32, 46, 0.94);
+    backdrop-filter: blur(6px);
+    border-bottom: 1px solid var(--line);
+  }
+
+  .toc-row {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    padding: 10px clamp(16px, 4vw, 32px);
+    max-width: 900px;
+    margin: 0 auto;
+    scrollbar-width: none;
+  }
+
+  .toc-row::-webkit-scrollbar { display: none; }
+
+  .toc a {
+    flex: none;
+    padding: 6px 12px;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    color: var(--dim);
+    text-decoration: none;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .toc a:hover, .toc a:focus-visible { border-color: var(--accent); color: var(--ink); }
+  .toc a:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+  /* ------------------------------------------------------------ section */
+
+  section.sec {
+    padding: clamp(36px, 6vw, 56px) 0;
+    border-bottom: 1px solid var(--line);
+    scroll-margin-top: 56px;
+  }
+
+  section.sec:last-of-type { border-bottom: 0; }
+
+  .sec-head {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+    flex-wrap: wrap;
+    margin-bottom: 6px;
+  }
+
+  .sec-num {
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--accent-dim);
+  }
+
+  .sec-head h2 {
+    margin: 0;
+    font-size: clamp(21px, 3vw, 26px);
+    font-weight: 800;
+    letter-spacing: -0.01em;
+  }
+
+  .sec-lede {
+    max-width: 66ch;
+    margin: 12px 0 0;
+    font-size: 15px;
+    color: var(--dim);
+  }
+
+  .sec-lede b { color: var(--ink); font-weight: 600; }
+
+  .sec-body {
+    display: grid;
+    grid-template-columns: 1.05fr 0.95fr;
+    gap: clamp(20px, 4vw, 36px);
+    margin-top: 22px;
+    align-items: start;
+  }
+
+  @media (max-width: 760px) {
+    .sec-body { grid-template-columns: 1fr; }
+  }
+
+  .sec-notes { display: flex; flex-direction: column; gap: 14px; }
+
+  .sec-notes h4 {
+    margin: 0 0 4px;
+    font-size: 11.5px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--dimmer);
+  }
+
+  .sec-notes ul { margin: 0; padding-left: 18px; font-size: 13.5px; color: var(--dim); }
+  .sec-notes li + li { margin-top: 6px; }
+  .sec-notes li b, .sec-notes li code { color: var(--ink); }
+  .sec-notes code {
+    font-family: var(--mono);
+    font-size: 0.92em;
+    background: var(--panel-2);
+    padding: 1px 5px;
+    border-radius: 4px;
+  }
+
+  .callout {
+    display: flex;
+    gap: 10px;
+    padding: 11px 13px;
+    border-radius: 10px;
+    border: 1px solid var(--line);
+    background: var(--panel);
+    font-size: 12.5px;
+    color: var(--dim);
+  }
+
+  .callout.tip { border-color: var(--accent-dim); }
+  .callout.tip .ic { color: var(--accent); }
+  .callout.warn { border-color: #6b5423; }
+  .callout.warn .ic { color: var(--amber); }
+
+  .callout .ic { flex: none; font-size: 14px; line-height: 1.4; }
+  .callout b { color: var(--ink); }
+
+  /* -------------------------------------------------------------- frame */
+
+  .frame {
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: linear-gradient(175deg, var(--panel), var(--bg-2) 140%);
+    box-shadow: 0 22px 50px -28px rgba(0, 0, 0, 0.6);
+    overflow: hidden;
+  }
+
+  .frame-label {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 7px 12px;
+    border-bottom: 1px solid var(--line);
+    background: var(--bg-2);
+    font-family: var(--mono);
+    font-size: 9.5px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--dimmer);
+  }
+
+  .frame-label span:last-child { color: var(--accent-dim); }
+  .frame-body { padding: 16px; }
+
+  /* ------------------------------------------------------------- diags */
+
+  .d-setup {
+    max-width: 260px;
+    margin: 0 auto;
+    padding: 18px;
+    border-radius: 12px;
+    border: 1px solid var(--line);
+    background: var(--panel);
+    text-align: center;
+  }
+
+  .d-setup h5 { margin: 0; font-size: 14px; font-weight: 700; }
+  .d-setup p { margin: 6px 0 0; font-size: 10.5px; color: var(--dimmer); }
+  .d-setup input {
+    display: block;
+    width: 100%;
+    margin-top: 12px;
+    padding: 8px 10px;
+    border-radius: 7px;
+    border: 1px solid var(--line);
+    background: var(--bg-2);
+    color: var(--dim);
+    font-size: 11px;
+  }
+  .d-setup .btn {
+    display: block;
+    width: 100%;
+    margin-top: 8px;
+    padding: 8px;
+    border-radius: 7px;
+    text-align: center;
+    font-size: 11px;
+    font-weight: 700;
+  }
+  .d-setup .btn.primary { background: var(--amber); color: #2a1c00; }
+  .d-setup .btn.ghost { margin-top: 6px; background: none; border: 1px solid var(--line); color: var(--dim); }
+
+  .d-curve { position: relative; height: 90px; margin-top: 10px; }
+  .d-curve svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+  .d-curve path { fill: none; stroke: var(--accent-dim); stroke-width: 2; }
+  .d-curve .dot { fill: var(--accent); }
+  .d-curve .plane {
+    position: absolute; left: 63%; top: 20%;
+    width: 10px; height: 10px; border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 0 2px var(--bg-2), 0 0 10px 2px rgba(86,189,233,.6);
+    transform: translate(-50%,-50%);
+  }
+
+  .d-ports {
+    display: flex; justify-content: space-between; font-family: var(--mono);
+  }
+  .d-ports b { font-size: 15px; }
+  .d-ports span { display: block; font-size: 8px; color: var(--dimmer); text-transform: uppercase; }
+  .d-ports .mid { text-align: center; }
+  .d-ports .mid b { font-size: 11px; }
+
+  .d-phases { display: flex; gap: 8px; margin-top: 10px; }
+  .d-phase {
+    flex: 1; padding: 8px 9px; border-radius: 9px; border: 1px solid var(--line);
+    font-family: var(--mono);
+  }
+  .d-phase.on { border-color: var(--accent); background: var(--panel-2); }
+  .d-phase .k { font-size: 8px; letter-spacing: .05em; text-transform: uppercase; color: var(--dimmer); }
+  .d-phase b { display: block; margin-top: 3px; font-size: 13px; color: var(--accent); }
+  .d-phase i { display: block; margin-top: 2px; font-style: normal; font-size: 8px; color: var(--dimmer); }
+
+  .d-compare { font-family: var(--mono); font-size: 10.5px; }
+  .d-row { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; padding: 5px 0; align-items: baseline; }
+  .d-row + .d-row { border-top: 1px solid var(--line); }
+  .d-row .k { color: var(--dimmer); font-size: 9px; text-transform: uppercase; letter-spacing: .04em; }
+  .d-row .p { color: var(--dimmer); text-align: right; }
+  .d-row .n { text-align: right; font-weight: 700; }
+  .d-row .n.amber { color: var(--amber); }
+
+  .d-note {
+    margin-top: 8px; padding: 7px 9px; border-radius: 7px;
+    background: rgba(255,176,46,.12); border: 1px solid #6b5423;
+    font-size: 10px; color: var(--amber);
+  }
+
+  .d-notam { border-radius: 10px; border: 1px solid var(--line); overflow: hidden; }
+  .d-notam-row { display: flex; align-items: center; gap: 8px; padding: 9px 11px; border-inline-start: 3px solid var(--red); }
+  .d-notam-row + .d-notam-row { border-top: 1px solid var(--line); border-inline-start-color: var(--amber); }
+  .d-notam-row .num { font-family: var(--mono); font-size: 10px; color: var(--dim); }
+  .d-notam-row .txt { flex: 1; font-size: 10px; color: var(--dimmer); }
+  .d-notam-row .chip {
+    flex: none; font-family: var(--mono); font-size: 8px; font-weight: 700;
+    padding: 2px 7px; border-radius: 999px; background: var(--accent-dim); color: #06222f;
+    text-transform: uppercase;
+  }
+
+  .d-bars { display: flex; flex-direction: column; gap: 8px; }
+  .d-bar-row { font-family: var(--mono); font-size: 9.5px; }
+  .d-bar-row .lbl { display: flex; justify-content: space-between; color: var(--dimmer); margin-bottom: 3px; }
+  .d-bar-row .lbl b { color: var(--ink); }
+  .d-bar-track { height: 6px; border-radius: 4px; background: var(--bg-2); overflow: hidden; }
+  .d-bar-fill { height: 100%; background: var(--accent-dim); }
+
+  .d-atc-row {
+    display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center;
+    padding: 7px 0; font-family: var(--mono); font-size: 10px;
+  }
+  .d-atc-row + .d-atc-row { border-top: 1px solid var(--line); }
+  .d-atc-row .pos { color: var(--dimmer); text-transform: uppercase; font-size: 9px; }
+  .d-atc-row .who { color: var(--dim); }
+  .d-atc-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--dimmer); justify-self: end; }
+  .d-atc-dot.on { background: var(--green); box-shadow: 0 0 6px 1px rgba(58,212,138,.7); }
+
+  .d-navrow {
+    display: grid; grid-template-columns: 1fr auto auto; gap: 8px; padding: 5px 0;
+    font-family: var(--mono); font-size: 9.5px; align-items: center;
+  }
+  .d-navrow + .d-navrow { border-top: 1px solid var(--line); }
+  .d-navrow.passed { opacity: .45; }
+  .d-navrow.current { background: rgba(86,189,233,.1); }
+  .d-navrow .fix { color: var(--ink); font-weight: 700; }
+  .d-navrow .fix .due { display: inline-block; width: 4px; height: 4px; border-radius: 50%; background: var(--amber); margin-left: 5px; }
+  .d-navrow .eto { color: var(--dimmer); }
+  .d-navrow input {
+    width: 46px; padding: 3px 5px; border-radius: 4px; border: 1px solid var(--line);
+    background: var(--bg-2); color: var(--accent); font-family: var(--mono); font-size: 9.5px; text-align: right;
+  }
+
+  .d-rephero { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .d-rephero div { text-align: center; padding: 8px; border-radius: 8px; background: var(--bg-2); }
+  .d-rephero span { display: block; font-size: 8px; letter-spacing: .04em; text-transform: uppercase; color: var(--dimmer); }
+  .d-rephero b { display: block; margin-top: 4px; font-family: var(--mono); font-size: 15px; font-weight: 700; }
+  .d-rephero i { display: block; margin-top: 2px; font-style: normal; font-size: 8.5px; color: var(--dimmer); }
+  .d-rephero i.g { color: var(--green); }
+
+  .d-gloss { text-align: center; font-family: var(--mono); font-size: 11px; color: var(--dim); line-height: 2.4; }
+  .d-gloss b { color: var(--ink); font-weight: 700; cursor: pointer; }
+  .d-gloss .bubble {
+    display: inline-block; margin-top: 6px; padding: 6px 11px; border-radius: 8px;
+    border: 1px solid var(--accent); background: var(--panel-2); font-size: 10px; color: var(--ink);
+  }
+  .d-gloss .bubble strong { color: var(--accent); }
+
+  .d-alert {
+    display: inline-flex; align-items: center; gap: 8px; padding: 8px 13px;
+    border: 1px solid var(--accent); border-radius: 999px; background: var(--panel-2);
+    font-family: var(--mono); font-size: 10px;
+  }
+  .d-alert b { color: var(--accent); }
+  .d-alert em { font-style: normal; color: var(--ink); font-weight: 700; }
+
+  .d-modes { display: flex; gap: 6px; }
+  .d-modes .m {
+    flex: 1; text-align: center; padding: 7px 4px; border-radius: 7px; border: 1px solid var(--line);
+    font-family: var(--mono); font-size: 8.5px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+    color: var(--dimmer);
+  }
+  .d-modes .m.on { border-color: var(--accent); background: var(--panel-2); color: var(--accent); }
+
+  /* ----------------------------------------------------------- footer */
+
+  .manual-foot {
+    padding: clamp(28px, 5vw, 40px) 0 clamp(36px, 6vw, 52px);
+    text-align: center;
+  }
+
+  .manual-foot p { margin: 0; font-size: 12px; color: var(--dimmer); }
+  .manual-foot p + p { margin-top: 6px; }
+
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+  }
+</style>
+</head>
+<body>
+
+<div class="appbar">
+  <a href="./index.html">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+    Back to the briefing
+  </a>
+</div>
+
+<div class="title-band">
+  <div class="wrap">
+    <span class="kicker">Flight Briefing &middot; User Manual</span>
+    <h1>How to fly with it</h1>
+    <p class="prose">
+      Every screen, in the order you'll actually reach for it &mdash; from connecting your
+      SimBrief account through to the report that opens itself once you're on the ground.
+    </p>
+    <div class="title-meta">
+      <span><b>8</b> screens</span>
+      <span><b>iPad &middot; iPhone &middot; Android</b> tablets</span>
+      <span><b>Works offline</b> once loaded</span>
+    </div>
+  </div>
+</div>
+
+<nav class="toc" aria-label="Sections">
+  <div class="toc-row">
+    <a href="#start">Getting started</a>
+    <a href="#overview">Overview</a>
+    <a href="#weather">Weather</a>
+    <a href="#notams">NOTAMs</a>
+    <a href="#fuel">Fuel &amp; Weights</a>
+    <a href="#performance">Performance</a>
+    <a href="#atc">ATC</a>
+    <a href="#navlog">Navlog</a>
+    <a href="#report">Report</a>
+    <a href="#glossary">Tap-to-decode</a>
+    <a href="#tablet">On a tablet</a>
+  </div>
+</nav>
+
+<div class="wrap">
+
+  <!-- ============================================================= -->
+  <section class="sec" id="start">
+    <div class="sec-head"><span class="sec-num">Start</span><h2>Connect to SimBrief</h2></div>
+    <p class="sec-lede">
+      Enter the same username or pilot ID you use on SimBrief. The briefing is built from your
+      <b>most recently generated OFP</b> &mdash; there is nothing else to configure first.
+    </p>
+
+    <div class="sec-body">
+      <div class="frame">
+        <div class="frame-label"><span>setup screen</span><span>diagram</span></div>
+        <div class="frame-body">
+          <div class="d-setup">
+            <h5>Connect to SimBrief</h5>
+            <p>Enter your SimBrief username or pilot ID.</p>
+            <input placeholder="USERNAME / PILOT ID" disabled />
+            <div class="btn primary">Load briefing</div>
+            <div class="btn ghost">View demo flight</div>
+          </div>
+        </div>
+      </div>
+      <div class="sec-notes">
+        <div>
+          <h4>What happens next</h4>
+          <ul>
+            <li>The plan opens on <b>Overview</b>, whichever chapter last session ended on.</li>
+            <li>Your username is remembered, so reopening the app skips this screen.</li>
+            <li><b>View demo flight</b> loads a sample OFP with no account needed &mdash; the fastest way to look around.</li>
+          </ul>
+        </div>
+        <div class="callout tip"><span class="ic">&#9432;</span><span>A demo briefing always carries a purple <b>DEMO</b> flag in the rail, so sample data is never mistaken for a real flight.</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================= -->
+  <section class="sec" id="overview">
+    <div class="sec-head"><span class="sec-num">01</span><h2>Overview</h2></div>
+    <p class="sec-lede">
+      The cover. A schedule you can watch happen: milestones on one line, the turnaround below
+      them, and &mdash; once you press <b>Airborne</b> &mdash; an aircraft that actually rides the curve.
+    </p>
+
+    <div class="sec-body">
+      <div class="frame">
+        <div class="frame-label"><span>schedule &middot; mid-flight</span><span>diagram</span></div>
+        <div class="frame-body">
+          <div class="d-ports">
+            <div><b>LEBL</b><span>Barcelona</span></div>
+            <div class="mid"><b>ELY2569</b></div>
+            <div style="text-align:right"><b>LCLK</b><span>Larnaca</span></div>
+          </div>
+          <div class="d-curve">
+            <svg viewBox="0 0 500 100" preserveAspectRatio="none">
+              <path d="M0,78 L130,78 C160,78 168,22 200,22 L320,22 C352,22 360,78 390,78 L500,78" />
+              <circle class="dot" cx="130" cy="78" r="3" />
+              <circle class="dot" cx="390" cy="78" r="3" />
+            </svg>
+            <div class="plane"></div>
+          </div>
+          <div class="d-phases">
+            <div class="d-phase on"><span class="k">Takeoff</span><b>1830Z</b><i>Airborne &middot; 2:10</i></div>
+            <div class="d-phase"><span class="k">Landing</span><b>2157Z</b><i>projected</i></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="sec-notes">
+        <div>
+          <h4>On this screen</h4>
+          <ul>
+            <li><b>Schedule curve</b> &mdash; STD/ETD/ETOT before departure, ETA/STA after. Once airborne, real times sit beside the planned ones with the delta between them.</li>
+            <li><b>Takeoff / Landing tiles</b> &mdash; one tap each. Pressing <b>Airborne</b> rebases every time in the whole briefing off the real wheels-up.</li>
+            <li><b>Dispatch, Route, Documents</b> &mdash; crew, aircraft, filed route and a link to the original OFP PDF.</li>
+            <li><b>Diversion</b> &mdash; the alternate's own figures, plus an <b>&ldquo;if you divert now&rdquo;</b> panel once you're flying (see below).</li>
+            <li><b>Watch items</b> &mdash; every exception the app has flagged, worst first, moved to the bottom so it's the last thing you check before pushback.</li>
+          </ul>
+        </div>
+        <div class="callout tip"><span class="ic">&#9432;</span><span>The countdown inside the curve counts <b>past zero</b> if you're running late &mdash; it never just freezes at 0:00.</span></div>
+      </div>
+    </div>
+
+    <div class="sec-body" style="margin-top:28px">
+      <div class="frame">
+        <div class="frame-label"><span>if you divert now</span><span>diagram</span></div>
+        <div class="frame-body">
+          <div style="font-family:var(--mono);font-size:9.5px;color:var(--amber);letter-spacing:.05em;text-transform:uppercase;margin-bottom:8px">
+            If you divert now &middot; from the fuel log
+          </div>
+          <div class="d-row"><span class="k">Fuel on board</span><span></span><span class="n">6,350 kg</span></div>
+          <div class="d-row"><span class="k">Would land at LCPH</span><span></span><span class="n">5,147 kg</span></div>
+          <div class="d-row"><span class="k">Over final reserve</span><span></span><span class="n amber">+4,027 kg</span></div>
+        </div>
+      </div>
+      <div class="sec-notes">
+        <div>
+          <h4>Where the numbers come from</h4>
+          <ul>
+            <li>Uses your <b>latest logged fuel reading</b> when there is one, the plan's figure for your current position when there isn't &mdash; and always says which.</li>
+            <li><b>Over final reserve</b> is what's left after landing at the alternate with reserve fuel still intact. It turns red the moment a diversion stops closing.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================= -->
+  <section class="sec" id="weather">
+    <div class="sec-head"><span class="sec-num">02</span><h2>Weather</h2></div>
+    <p class="sec-lede">
+      METAR and TAF for departure, arrival and every alternate, plus SIGMETs and the charts SimBrief
+      generated for the route. A live pull from VATSIM replaces the OFP's snapshot the moment it lands.
+    </p>
+
+    <div class="sec-body">
+      <div class="frame">
+        <div class="frame-label"><span>departure metar &middot; live</span><span>diagram</span></div>
+        <div class="frame-body">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+            <span style="width:7px;height:7px;border-radius:50%;background:var(--green)"></span>
+            <span style="font-family:var(--mono);font-size:10px;color:var(--dim)">DEP &nbsp;LEBL &middot; Barcelona</span>
+            <span style="margin-left:auto;font-family:var(--mono);font-size:8px;font-weight:700;letter-spacing:.05em;color:var(--green);background:rgba(58,212,138,.15);padding:2px 7px;border-radius:999px">LIVE</span>
+          </div>
+          <div class="d-gloss" style="text-align:left;line-height:1.9">
+            LEBL 151830Z <b>33008KT</b> CAVOK 15/11 Q1023 NOSIG
+          </div>
+        </div>
+      </div>
+      <div class="sec-notes">
+        <div>
+          <h4>On this screen</h4>
+          <ul>
+            <li><b>WX / Charts tabs</b> at the top &mdash; raw METAR/TAF on one, SimBrief's SigWx and winds-aloft images on the other.</li>
+            <li>Every airport gets three quick figures &mdash; temperature, wind, ceiling &mdash; before you read a single raw line.</li>
+            <li>A coloured dot shows flight category at a glance: green VFR through red LIFR.</li>
+            <li>The refresh icon beside the freshness note re-pulls VATSIM on demand; otherwise it refreshes itself every 30 minutes.</li>
+          </ul>
+        </div>
+        <div class="callout tip"><span class="ic">&#9432;</span><span>Every bold token &mdash; wind groups, cloud, CAVOK, the lot &mdash; taps open. See <a href="#glossary" style="color:var(--accent)">Tap-to-decode</a>.</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================= -->
+  <section class="sec" id="notams">
+    <div class="sec-head"><span class="sec-num">03</span><h2>NOTAMs</h2></div>
+    <p class="sec-lede">
+      Every notice for departure, arrival and the alternates, ranked by severity, with the ones
+      touching your planned runway raised to the top.
+    </p>
+
+    <div class="sec-body">
+      <div class="frame">
+        <div class="frame-label"><span>notams &middot; departure</span><span>diagram</span></div>
+        <div class="frame-body">
+          <div style="display:flex;justify-content:flex-end;margin-bottom:10px">
+            <span style="font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:.05em;color:var(--accent);background:var(--panel-2);border:1px solid var(--accent-dim);padding:4px 10px;border-radius:999px">17 UNREAD &middot; MARK READ</span>
+          </div>
+          <div class="d-notam">
+            <div class="d-notam-row"><span class="num">A1234/25</span><span class="txt">RWY 06L/24R CLSD WEF 2603111200</span><span class="chip">Unread</span></div>
+            <div class="d-notam-row"><span class="num">A1198/25</span><span class="txt">TWY B LTD WIDTH DUE WIP</span><span class="chip">Unread</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="sec-notes">
+        <div>
+          <h4>On this screen</h4>
+          <ul>
+            <li>Filter to what's active during your flight window, hide obstacles, search by text or runway.</li>
+            <li><b>Mark read</b> tracks what you've already reviewed &mdash; by NOTAM number, not by flight, so re-pulling the OFP keeps it. A second look before pushback shows only what's new.</li>
+            <li>Global FIR notices for the route sit in their own section below the airport cards.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================= -->
+  <section class="sec" id="fuel">
+    <div class="sec-head"><span class="sec-num">04</span><h2>Fuel &amp; Weights</h2></div>
+    <p class="sec-lede">
+      The plan's own fuel breakdown, weights against their limits, and a chart that plots your
+      logged readings straight over the planned burn curve.
+    </p>
+
+    <div class="sec-body">
+      <div class="frame">
+        <div class="frame-label"><span>fuel plan</span><span>diagram</span></div>
+        <div class="frame-body">
+          <div class="d-bars">
+            <div class="d-bar-row"><div class="lbl"><span>Taxi</span><b>487 kg</b></div><div class="d-bar-track"><div class="d-bar-fill" style="width:4%"></div></div></div>
+            <div class="d-bar-row"><div class="lbl"><span>Enroute burn</span><b>10,435 kg</b></div><div class="d-bar-track"><div class="d-bar-fill" style="width:76%"></div></div></div>
+            <div class="d-bar-row"><div class="lbl"><span>Contingency (5%)</span><b>685 kg</b></div><div class="d-bar-track"><div class="d-bar-fill" style="width:5%;background:var(--amber)"></div></div></div>
+            <div class="d-bar-row"><div class="lbl"><span>Alternate</span><b>1,203 kg</b></div><div class="d-bar-track"><div class="d-bar-fill" style="width:9%"></div></div></div>
+            <div class="d-bar-row"><div class="lbl"><span>Final reserve</span><b>1,120 kg</b></div><div class="d-bar-track"><div class="d-bar-fill" style="width:8%;background:var(--green)"></div></div></div>
+          </div>
+        </div>
+      </div>
+      <div class="sec-notes">
+        <div>
+          <h4>On this screen</h4>
+          <ul>
+            <li><b>Fuel plan</b> &mdash; every bucket from ramp to landing, drawn to scale.</li>
+            <li><b>Fuel margin along the route</b> &mdash; plan versus minimum along every fix; your logged readings appear as dots directly on the curve.</li>
+            <li><b>Loading &amp; weights</b> &mdash; ZFW, TOW and LDW as meters against their limits, not just numbers.</li>
+            <li><b>Extra fuel</b> and <b>What-if</b> &mdash; what was added over the plan, and how much a different cruise altitude or cost index would cost.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================= -->
+  <section class="sec" id="performance">
+    <div class="sec-head"><span class="sec-num">05</span><h2>Performance</h2></div>
+    <p class="sec-lede">
+      Takeoff and landing numbers for the planned runway &mdash; V-speeds, weight limits, the runway
+      drawn to scale &mdash; each with the current wind checked against what was planned.
+    </p>
+
+    <div class="sec-body">
+      <div class="frame">
+        <div class="frame-label"><span>landing wind &middot; planned vs now</span><span>diagram</span></div>
+        <div class="frame-body">
+          <div class="d-compare">
+            <div class="d-row"><span class="k"></span><span class="p">Planned</span><span class="p">Now</span></div>
+            <div class="d-row"><span class="k">Wind</span><span class="p">345&deg; / 9 kt</span><span class="n">220&deg; / 9 kt</span></div>
+            <div class="d-row"><span class="k">Along runway</span><span class="p">5 kt Head</span><span class="n amber">9 kt Tail</span></div>
+            <div class="d-row"><span class="k">Crosswind</span><span class="p">7 kt</span><span class="n">1 kt</span></div>
+          </div>
+          <div class="d-note">The planned runway is now downwind: 5&nbsp;kt HEAD &rarr; 9&nbsp;kt TAIL.</div>
+        </div>
+      </div>
+      <div class="sec-notes">
+        <div>
+          <h4>On this screen</h4>
+          <ul>
+            <li>V1 / VR / V2 and the runway strip, exactly as SimBrief computed them for the planned runway.</li>
+            <li>The <b>Now</b> column only appears once a live METAR has landed &mdash; it resolves onto the same heading the plan used, so it's a true comparison, not just a fresher observation.</li>
+            <li>A note appears automatically when the wind has crossed a limit, or flipped a headwind into a tailwind, since the plan was built.</li>
+            <li>Every other runway is listed below, in case of a late change.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================= -->
+  <section class="sec" id="atc">
+    <div class="sec-head"><span class="sec-num">06</span><h2>ATC</h2></div>
+    <p class="sec-lede">
+      Every position you'll work through, in order &mdash; delivery to tower at departure, the FIRs
+      along the route, approach down to ground at arrival &mdash; with live staffing from VATSIM.
+    </p>
+
+    <div class="sec-body">
+      <div class="frame">
+        <div class="frame-label"><span>stations &middot; departure</span><span>diagram</span></div>
+        <div class="frame-body">
+          <div class="d-atc-row"><span class="pos">Delivery</span><span class="who">Unstaffed</span><span class="d-atc-dot"></span></div>
+          <div class="d-atc-row"><span class="pos">Ground</span><span class="who">Unstaffed</span><span class="d-atc-dot"></span></div>
+          <div class="d-atc-row"><span class="pos">Tower</span><span class="who">LEBL_TWR &middot; Info C</span><span class="d-atc-dot on"></span></div>
+          <div class="d-atc-row"><span class="pos">Approach</span><span class="who">Unstaffed</span><span class="d-atc-dot"></span></div>
+        </div>
+      </div>
+      <div class="sec-notes">
+        <div>
+          <h4>On this screen</h4>
+          <ul>
+            <li>A lit green dot means someone is actually online there right now &mdash; not just that the frequency exists.</li>
+            <li>ATIS and CENTER broadcasts show their full text, including the information letter, active runways and any CPDLC logon.</li>
+            <li>The filed ICAO flight plan sits at the bottom with a one-tap copy button.</li>
+          </ul>
+        </div>
+        <div class="callout warn"><span class="ic">&#9888;</span><span>SimBrief doesn't provide radio frequencies for unstaffed positions &mdash; the app never invents one. What you see is exactly what VATSIM reports.</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================= -->
+  <section class="sec" id="navlog">
+    <div class="sec-head"><span class="sec-num">07</span><h2>Navlog</h2></div>
+    <p class="sec-lede">
+      The full route as flown, fix by fix, with a fuel check you fill in as the flight goes &mdash;
+      what the plan predicted at each point against what the gauges actually read.
+    </p>
+
+    <div class="sec-body">
+      <div class="frame">
+        <div class="frame-label"><span>fuel check &middot; mid-flight</span><span>diagram</span></div>
+        <div class="frame-body">
+          <div class="d-navrow" style="color:var(--dimmer);font-weight:700"><span>Fix</span><span>ETO</span><span>Actual</span></div>
+          <div class="d-navrow passed"><span class="fix">EVENO</span><span class="eto">0512Z</span><span></span></div>
+          <div class="d-navrow passed"><span class="fix">TOSNU<span class="due"></span></span><span class="eto">0549Z</span><span style="color:var(--accent)">11,500</span></div>
+          <div class="d-navrow current"><span class="fix">ORKUM</span><span class="eto" style="color:var(--accent);font-weight:700">0650Z</span><span><input placeholder="&mdash;" disabled /></span></div>
+          <div class="d-navrow"><span class="fix">PNZ<span class="due"></span></span><span class="eto">0744Z</span><span></span></div>
+        </div>
+      </div>
+      <div class="sec-notes">
+        <div>
+          <h4>On this screen</h4>
+          <ul>
+            <li><b>ETO</b> is the real estimated time over each fix once you're airborne, computed off your actual wheels-up &mdash; not the plan's original schedule.</li>
+            <li>Fixes already behind the aircraft dim; the one you're flying toward is highlighted.</li>
+            <li>An amber dot marks the fixes worth a reading. Three cadences, in the toggle above the table:</li>
+          </ul>
+          <div class="d-modes" style="margin-top:8px">
+            <div class="m on">Key points</div>
+            <div class="m">Every fix</div>
+            <div class="m">Manual</div>
+          </div>
+        </div>
+        <div class="callout tip"><span class="ic">&#9432;</span><span><b>Key points</b> asks at the top of climb, each hour of cruise, top of descent and destination. <b>Manual</b> turns prompting off entirely &mdash; fill in any row, any time, at your own pace.</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================= -->
+  <section class="sec" id="report">
+    <div class="sec-head"><span class="sec-num">08</span><h2>Report</h2></div>
+    <p class="sec-lede">
+      The record. It fills in as the flight runs and <b>opens itself the moment you land</b> &mdash;
+      every figure paired against exactly what the plan said.
+    </p>
+
+    <div class="sec-body">
+      <div class="frame">
+        <div class="frame-label"><span>flight complete</span><span>diagram</span></div>
+        <div class="frame-body">
+          <div class="d-rephero">
+            <div><span>Flight time</span><b>3:47</b><i class="g">&minus;0:02</i></div>
+            <div><span>Landing fuel</span><b>2,890 kg</b><i>&minus;118 kg</i></div>
+            <div><span>Burn</span><b>8,610 kg</b><i class="g">&minus;2 kg</i></div>
+            <div><span>Passengers</span><b>184 / 184</b><i></i></div>
+          </div>
+        </div>
+      </div>
+      <div class="sec-notes">
+        <div>
+          <h4>On this screen</h4>
+          <ul>
+            <li>Read mid-flight, it's a progress report; read after landing, it's the record.</li>
+            <li>Times, fuel, the full logged table with its curve, weights against their limits, the weather actually flown at both ends, and every exception the app raised along the way.</li>
+            <li>A time the clock projects but nobody has confirmed is labelled <code>projected</code> rather than shown as measured.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================= -->
+  <section class="sec" id="glossary">
+    <div class="sec-head"><span class="sec-num">+</span><h2>Tap-to-decode</h2></div>
+    <p class="sec-lede">
+      Every bold token in a METAR, TAF, NOTAM or SIGMET &mdash; anywhere in the app &mdash; opens a
+      plain-English definition right where you tapped it.
+    </p>
+
+    <div class="sec-body">
+      <div class="frame">
+        <div class="frame-label"><span>tap a token</span><span>diagram</span></div>
+        <div class="frame-body">
+          <div class="d-gloss">
+            LEBL 151830Z <b>33008KT</b> CAVOK
+            <span class="bubble"><strong>33008KT</strong> &rarr; From 330&deg; at 8&nbsp;kt</span>
+          </div>
+        </div>
+      </div>
+      <div class="sec-notes">
+        <div>
+          <h4>How it reads a code</h4>
+          <ul>
+            <li>Compound groups are parsed, not listed &mdash; <code>27015G28KT</code> and <code>09007KT</code> both decode correctly without either being memorised individually.</li>
+            <li>Covers wind, cloud, visibility, weather phenomena, altimeter, the TAF change indicators, and SIGMET's own vocabulary (<code>SEV</code>, <code>TURB</code>, <code>EMBD</code>&hellip;).</li>
+            <li>Close it by tapping it again, tapping anywhere else, or pressing <code>Esc</code>.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================= -->
+  <section class="sec" id="tablet" style="border-bottom:0">
+    <div class="sec-head"><span class="sec-num">+</span><h2>On a tablet, for the whole leg</h2></div>
+    <p class="sec-lede">Three things that only matter once the app is on a stand instead of a desk.</p>
+
+    <div class="sec-body">
+      <div class="frame">
+        <div class="frame-label"><span>milestone alert</span><span>diagram</span></div>
+        <div class="frame-body" style="display:flex;justify-content:center;padding:24px 16px">
+          <div class="d-alert"><b>TOP OF DESCENT</b><span>in</span><em>0:05</em><span>&middot; 1634Z</span></div>
+        </div>
+      </div>
+      <div class="sec-notes">
+        <div>
+          <h4>Alerts</h4>
+          <ul>
+            <li>A banner and a chime for off-blocks, wheels-up and top of descent, timed off the real clock.</li>
+            <li>Turn on the bell in the rail to also mirror it to your system notification tray.</li>
+          </ul>
+        </div>
+        <div>
+          <h4>Offline &amp; the screen</h4>
+          <ul>
+            <li>Once loaded, the app keeps working with no signal &mdash; the shell is cached, and the last weather and traffic pull stays on screen with its age shown honestly.</li>
+            <li>The display is kept awake for as long as the briefing is open, so the fuel-check prompt is never missed behind a locked screen.</li>
+            <li>Live weather and VATSIM staffing refresh themselves every 30 minutes without asking.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<div class="manual-foot">
+  <p>Flight Briefing &middot; built on your SimBrief OFP</p>
+  <p>Diagrams on this page are faithful re-creations of the real screens, not photographs of them.</p>
+</div>
+
+</body>
+</html>

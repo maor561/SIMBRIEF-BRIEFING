@@ -204,6 +204,9 @@ function renderRail() {
       <span class="clock" id="clock">${escapeHtml(fmtZulu(new Date()))}</span>
       ${alertsButton()}
       ${installButton()}
+      <button class="rail-btn" data-action="open-manual" title="${escapeHtml(t('manual.open'))}" aria-label="${escapeHtml(t('manual.open'))}">
+        <svg class="glyph" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 7.5h.01"/></svg>
+      </button>
       <button class="rail-btn" data-action="refresh" title="${escapeHtml(t('header.refresh'))}" aria-label="${escapeHtml(t('header.refresh'))}">
         <svg class="glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.4-5.7M20 4v4h-4"/></svg>
       </button>
@@ -606,6 +609,13 @@ document.addEventListener('click', (event) => {
 
     case 'install-app':
       runInstall(trigger);
+      break;
+
+    // A new tab, not a chapter switch: the manual is reference material read
+    // beside the briefing, not a screen inside it, and a crew mid-flight
+    // should never lose their place in the briefing to open it.
+    case 'open-manual':
+      window.open('manual.html', '_blank', 'noopener');
       break;
 
     case 'clear-fuel-log':

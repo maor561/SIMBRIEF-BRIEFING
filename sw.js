@@ -23,6 +23,7 @@ const DATA = `sbb-data-${VERSION}`;
 const SHELL_FILES = [
   './',
   './index.html',
+  './manual.html',
   './css/brief.css',
   './manifest.webmanifest',
   './icons/icon.svg',
