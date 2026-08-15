@@ -70,9 +70,11 @@ function signedWeight(value, units) {
 }
 
 /**
- * How often to be asked for a reading. Two positions, because the honest
- * choice is between "the points that mean something" and "all of them" --
- * anything in between is a number nobody can reason about.
+ * How often to be asked for a reading. Three positions: the points that mean
+ * something, all of them, or none -- 'manual' turns the prompt off entirely
+ * and leaves every row in the table open for the crew to fill in on their own
+ * schedule. The table itself never refuses a reading regardless of which is
+ * chosen; this only governs whether anything goes looking for one.
  */
 function promptModeToggle() {
   const mode = getPromptMode();
@@ -83,6 +85,7 @@ function promptModeToggle() {
   return `<span class="seg" role="group" aria-label="${escapeHtml(t('nl.promptCadence'))}">
     ${option('key', t('nl.modeKey'))}
     ${option('all', t('nl.modeAll'))}
+    ${option('manual', t('nl.modeManual'))}
   </span>`;
 }
 
@@ -91,13 +94,15 @@ function fuelCheckBody(model, actuals, timeline, leg) {
   if (!fixes.length) return `<div class="empty-state">${escapeHtml(t('common.notAvailable'))}</div>`;
 
   const unit = model.units === 'lbs' ? 'lb' : 'kg';
-  const due = new Set(fuelCheckpoints(model).map((c) => c.fix.index));
+  const mode = getPromptMode();
+  const due = new Set(fuelCheckpoints(model, mode).map((c) => c.fix.index));
 
   return `
     <div class="atc-note">
       ${icon('info', { size: 13 })}
       ${escapeHtml(t('nl.fuelCheckNote'))} ${fmtWeight(model.fuel.contingency, model.units)}
     </div>
+    ${mode === 'manual' ? `<div class="atc-note">${icon('info', { size: 13 })}${escapeHtml(t('nl.manualNote'))}</div>` : ''}
 
     <div data-fuel-summary>${summaryPanel(model, actuals)}</div>
 

@@ -43,6 +43,8 @@ import {
   currentLeg,
   fuelCheckpoints,
   dueCheckpoint,
+  getPromptMode,
+  setPromptMode,
   diversionNow,
   alertPoints,
   dueAlert
@@ -744,6 +746,23 @@ check('can be told to ask at every fix instead', () => {
   assert.equal(all.length, model.navlog.filter((f) => Number.isFinite(f.fuelOnBoard)).length);
   assert.equal(all.length > key.length, true);
   assert.equal(all.every((c) => c.why === 'fix'), true);
+});
+
+check('or told to ask nothing at all', () => {
+  withStorage(() => {
+    assert.deepEqual(fuelCheckpoints(model, 'manual'), []);
+
+    // Even mid-flight past every checkpoint, manual mode never surfaces one.
+    const off = Date.UTC(2026, 2, 11, 19, 0, 0);
+    const timeline = { phases: { takeoff: { at: off } } };
+    assert.equal(dueCheckpoint(model, timeline, {}, off + model.times.estTimeEnroute * 1000, 'manual'), null);
+
+    // The choice persists and falls back to 'key' for anything unrecognised.
+    setPromptMode('manual');
+    assert.equal(getPromptMode(), 'manual');
+    setPromptMode('nonsense');
+    assert.equal(getPromptMode(), 'key');
+  });
 });
 
 check('only asks about a checkpoint the flight has actually reached', () => {

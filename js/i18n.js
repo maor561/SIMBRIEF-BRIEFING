@@ -242,6 +242,8 @@ const STRINGS = {
   'nl.promptCadence': 'How often to prompt for fuel',
   'nl.modeKey': 'Key points',
   'nl.modeAll': 'Every fix',
+  'nl.modeManual': 'Manual',
+  'nl.manualNote': 'No automatic prompts. Enter a reading at any fix below, whenever you have one.',
 
   'notam.new': 'NEW',
   'notam.unread': 'UNREAD',

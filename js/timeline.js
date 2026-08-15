@@ -275,10 +275,19 @@ export function dueAlert(model, timeline, seen = new Set(), now = Date.now()) {
 
 const MODE_KEY = 'sbb.fuelPromptMode';
 
-/** 'key' asks at the points that carry information; 'all' at every fix. */
+const PROMPT_MODES = ['key', 'all', 'manual'];
+
+/**
+ * 'key' asks at the points that carry information; 'all' at every fix;
+ * 'manual' does not ask at all -- the crew opens the Navlog themselves and
+ * types into whichever row they want, whenever they want. The fuel log
+ * accepts a reading at any fix regardless of mode; this only governs whether
+ * anything goes looking for one.
+ */
 export function getPromptMode() {
   try {
-    return globalThis.localStorage?.getItem(MODE_KEY) === 'all' ? 'all' : 'key';
+    const stored = globalThis.localStorage?.getItem(MODE_KEY);
+    return PROMPT_MODES.includes(stored) ? stored : 'key';
   } catch {
     return 'key';
   }
@@ -286,7 +295,7 @@ export function getPromptMode() {
 
 export function setPromptMode(mode) {
   try {
-    globalThis.localStorage?.setItem(MODE_KEY, mode === 'all' ? 'all' : 'key');
+    globalThis.localStorage?.setItem(MODE_KEY, PROMPT_MODES.includes(mode) ? mode : 'key');
   } catch {
     /* storage disabled; the choice lasts the session only */
   }
@@ -303,10 +312,12 @@ export function setPromptMode(mode) {
  * descent (the last point a diversion is cheap) and the destination.
  *
  * A crew that wants the full log can have it: 'all' mode returns every fix.
+ * 'manual' returns none -- there is no suggested point, because the whole
+ * idea of that mode is that the crew is choosing, not being prompted.
  */
 export function fuelCheckpoints(model, mode = getPromptMode()) {
   const fixes = model.navlog.filter((f) => Number.isFinite(f.timeTotal));
-  if (!fixes.length) return [];
+  if (!fixes.length || mode === 'manual') return [];
 
   if (mode === 'all') {
     return fixes
