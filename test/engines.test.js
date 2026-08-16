@@ -25,9 +25,10 @@ import {
   screenEnrouteNotam,
   flightCategory,
   categoryRank,
-  highlightWx
+  highlightWx,
+  fmtLocal
 } from '../js/decode.js';
-import { runwayWind } from '../js/wind.js';
+import { runwayWind, estimateRunwayCourse, alternateWind } from '../js/wind.js';
 import { notamKey, isRead, markRead, markUnread, unreadCount } from '../js/notamlog.js';
 import { decodeWxToken, decodeNotamToken, decodeToken } from '../js/glossary.js';
 import { aircraftPoint } from '../js/views/overview.js';
@@ -49,7 +50,8 @@ import {
   setPromptMode,
   diversionNow,
   alertPoints,
-  dueAlert
+  dueAlert,
+  markAlertSeen
 } from '../js/timeline.js';
 
 const fixturePath = fileURLToPath(new URL('./fixture.json', import.meta.url));
@@ -523,6 +525,38 @@ check('says nothing about a wind with no direction', () => {
   );
 });
 
+check('reads a runway number as its approximate heading', () => {
+  assert.equal(estimateRunwayCourse('22'), 220);
+  assert.equal(estimateRunwayCourse('04L'), 40, 'a side suffix does not change the heading');
+  assert.equal(estimateRunwayCourse('27C'), 270);
+  assert.equal(estimateRunwayCourse(''), null);
+  assert.equal(estimateRunwayCourse(null), null);
+  assert.equal(estimateRunwayCourse('00'), null, 'zero is not a heading');
+});
+
+check('resolves the live wind at the alternate off its runway number, and never with confidence', () => {
+  const altn = model.alternates[0];
+  assert.equal(altn.plannedRunway, '11', 'the fixture plans LCPH 11');
+
+  const liveMetar = {
+    state: 'ready',
+    fetchedAt: 12345,
+    metars: { [altn.icao]: 'LCPH 101630Z 11015G25KT 9999 20/10 Q1015' }
+  };
+
+  const wind = alternateWind(altn, liveMetar);
+  assert.equal(wind.approx, true, 'never shown with TLR-grade confidence');
+  assert.equal(wind.runway, '11');
+  assert.equal(wind.approxCourse, 110);
+  assert.equal(wind.headwind, 15);
+  assert.equal(wind.gust.crosswind, 0);
+
+  // No live METAR yet, or nothing to resolve against: null, not a guess.
+  assert.equal(alternateWind(altn, { state: 'loading' }), null);
+  assert.equal(alternateWind({ ...altn, plannedRunway: null }, liveMetar), null);
+  assert.equal(alternateWind(altn, { state: 'ready', metars: {} }), null);
+});
+
 /* -------------------------------------------------------------- timeline */
 
 /** localStorage stand-in, so the stores under test have somewhere to write. */
@@ -714,6 +748,27 @@ check('works out whether a diversion still closes from here', () => {
   assert.equal(short.margin < 0, true);
 });
 
+check('prices whichever alternate it is asked about, not only the first', () => {
+  const off = Date.UTC(2026, 2, 11, 19, 0, 0);
+  const timeline = { phases: { takeoff: { at: off } } };
+  const reserve = model.fuel.reserve;
+
+  // A second filed alternate with its own, heavier burn.
+  const second = { ...model.alternates[0], icao: 'LCEN', burn: model.alternates[0].burn + 400 };
+
+  const first = diversionNow(model, timeline, { 27: 3100 }, off + 3600 * 1000, model.alternates[0]);
+  const other = diversionNow(model, timeline, { 27: 3100 }, off + 3600 * 1000, second);
+
+  assert.equal(first.icao, model.alternates[0].icao);
+  assert.equal(other.icao, 'LCEN');
+  assert.equal(other.landingWith, 3100 - second.burn);
+  assert.equal(other.landingWith < first.landingWith, true, 'the heavier alternate leaves less on landing');
+  assert.equal(other.margin, 3100 - second.burn - reserve);
+
+  // No default silently prices the first alternate for anyone who omits it.
+  assert.equal(diversionNow(model, timeline, {}, off + 3600 * 1000).icao, model.alternates[0].icao);
+});
+
 check('raises the milestones worth interrupting for', () => {
   // Before takeoff the alerts come from the plan.
   const planned = alertPoints(model, { phases: {} }).map((p) => p.key);
@@ -739,6 +794,38 @@ check('raises the milestones worth interrupting for', () => {
 
   // And never twice.
   assert.equal(dueAlert(model, timeline, new Set(['tod']), at - 5 * 60 * 1000), null);
+});
+
+check('remembers a dismissed alert past a reload', () => {
+  withStorage(() => {
+    assert.deepEqual(getTimeline(model).seenAlerts, [], 'nothing seen yet');
+
+    const after = markAlertSeen(model, 'tod');
+    assert.deepEqual(after.seenAlerts, ['tod']);
+
+    // The same store a fresh page load would read back.
+    assert.deepEqual(getTimeline(model).seenAlerts, ['tod'], 'survives past the call that wrote it');
+
+    // Marking the same key again does not duplicate it.
+    const again = markAlertSeen(model, 'tod');
+    assert.deepEqual(again.seenAlerts, ['tod']);
+
+    const both = markAlertSeen(model, 'etot');
+    assert.deepEqual(both.seenAlerts, ['tod', 'etot']);
+  });
+});
+
+check('backfills seenAlerts for a timeline saved before the field existed', () => {
+  withStorage(() => {
+    // What a tablet had on disk before this release, written directly rather
+    // than through markAlertSeen so nothing here depends on it.
+    globalThis.localStorage.setItem(
+      'sbb.timeline',
+      JSON.stringify({ key: `${model.flight.callsign}-${model.generatedAt.getTime()}`, timeline: { phases: {}, current: null } })
+    );
+
+    assert.deepEqual(getTimeline(model).seenAlerts, [], 'reads back as empty, not undefined');
+  });
 });
 
 check('can be told to ask at every fix instead', () => {
@@ -891,6 +978,20 @@ check('decodes temperature, altimeter and time groups', () => {
   assert.equal(decodeWxToken('101630Z'), 'Observed on day 10 at 16:30Z');
   assert.equal(decodeWxToken('FM211800'), 'From day 21, 18:00Z');
   assert.equal(decodeWxToken('PROB30'), '30% probability');
+});
+
+check('reads an airport clock off its UTC offset, no timezone database involved', () => {
+  const z = new Date(Date.UTC(2026, 2, 11, 23, 45));
+
+  assert.equal(fmtLocal(z, 2), '0145 LT', 'LCLK at UTC+2 is ahead into the next day');
+  assert.equal(fmtLocal(z, -5), '1845 LT', 'a negative offset moves the clock back');
+  assert.equal(fmtLocal(z, 5.5), '0515 LT', 'a fractional offset (India, Sri Lanka) is honoured');
+  assert.equal(fmtLocal(z, 0), '2345 LT');
+
+  // Nothing sane to report without a real date or a finite offset.
+  assert.equal(fmtLocal(new Date('not a date'), 2), null);
+  assert.equal(fmtLocal(z, null), null);
+  assert.equal(fmtLocal(z, undefined), null);
 });
 
 check('falls back to the fixed vocabulary, and to nothing when unrecognised', () => {

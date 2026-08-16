@@ -68,7 +68,7 @@ function write(data) {
   }
 }
 
-const EMPTY = { phases: {}, current: null };
+const EMPTY = { phases: {}, current: null, seenAlerts: [] };
 
 /** The timeline for this flight, or a clean one if none has been started. */
 export function getTimeline(model) {
@@ -84,6 +84,25 @@ function save(model, timeline) {
 
 export function resetTimeline(model) {
   return save(model, { ...EMPTY });
+}
+
+/**
+ * Records that a milestone alert has been shown and dismissed, so it stays
+ * dismissed across a reload.
+ *
+ * Without this, dismissing "TOP OF DESCENT" and then having the page reload
+ * mid-flight -- the service worker updating itself, a dead zone, the crew
+ * just reopening the tab -- brought the same alert straight back, because the
+ * set that remembered it was a plain in-memory Set with nothing behind it.
+ * Persisting it here, in the same store as everything else about this flight,
+ * means the dismissal survives exactly as long as the flight it belongs to.
+ */
+export function markAlertSeen(model, key) {
+  const timeline = getTimeline(model);
+  if (timeline.seenAlerts?.includes(key)) return timeline;
+
+  timeline.seenAlerts = [...(timeline.seenAlerts || []), key];
+  return save(model, timeline);
 }
 
 /* ---------------------------------------------------------------- driving */
@@ -395,9 +414,15 @@ export function dueCheckpoint(model, timeline, actuals, now = Date.now(), mode =
  * The margin is what is left after landing at the alternate with the reserve
  * still intact. Once it goes negative the diversion no longer closes, which is
  * the moment worth seeing coming.
+ *
+ * Takes the alternate to price, defaulting to the first: a flight can file
+ * more than one, and the fuel math is identical for any of them -- it only
+ * needs that alternate's own burn figure, which SimBrief gives for every one
+ * listed, not just the first. (The detailed fix-by-fix track is a different
+ * story -- SimBrief only computes that for the first alternate -- but this
+ * function never needed the track.)
  */
-export function diversionNow(model, timeline, actuals = {}, now = Date.now()) {
-  const alternate = model.alternates[0];
+export function diversionNow(model, timeline, actuals = {}, now = Date.now(), alternate = model.alternates[0]) {
   if (!alternate || !Number.isFinite(alternate.burn)) return null;
 
   const reserve = model.fuel.reserve ?? 0;

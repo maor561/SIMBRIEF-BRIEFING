@@ -13,7 +13,7 @@
  * error.
  */
 
-import { windComponents } from './decode.js';
+import { windComponents, parseMetar } from './decode.js';
 
 /**
  * The components a crew would actually brief from one METAR.
@@ -85,4 +85,45 @@ function sweepArc(course, wind, speed) {
 
   if (!Number.isFinite(headwind)) return null;
   return { from: varyFrom, to: varyTo, crosswind, headwind };
+}
+
+/**
+ * A runway's approximate heading, read off its own number: "22" faces
+ * roughly 220°, "04L" roughly 040°. This is the standard convention runway
+ * numbers are assigned by, not a guess -- but it is still only the number
+ * rounded to the nearest 10°, in degrees *magnetic*, with no correction for
+ * the local variation between magnetic and true. That is the gap between this
+ * and the real `trueCourse` SimBrief computes for the takeoff and landing
+ * runways: exact figures for those come with the TLR, so this is only ever
+ * used where the TLR does not reach -- the alternate, which SimBrief gives a
+ * planned runway for but never a full performance analysis.
+ */
+export function estimateRunwayCourse(identifier) {
+  const digits = String(identifier || '').match(/^(\d{1,2})/);
+  if (!digits) return null;
+  const heading = Number(digits[1]) * 10;
+  return heading >= 10 && heading <= 360 ? heading : null;
+}
+
+/**
+ * The live wind at an alternate, resolved onto its planned runway as best the
+ * data allows.
+ *
+ * Marked `approx` unconditionally: even a well-behaved resolve here is built
+ * on a heading read off a runway number rather than SimBrief's own course
+ * figure, so it is never entitled to the same confidence as the takeoff and
+ * landing comparisons. Good enough to show a crosswind that has clearly
+ * turned into a problem; not the number to fly an approach off.
+ */
+export function alternateWind(alternate, liveMetar) {
+  if (!alternate?.plannedRunway || liveMetar?.state !== 'ready') return null;
+
+  const raw = liveMetar.metars?.[alternate.icao];
+  const course = estimateRunwayCourse(alternate.plannedRunway);
+  if (!raw || !course) return null;
+
+  const resolved = runwayWind({ trueCourse: course }, parseMetar(raw));
+  if (!resolved) return null;
+
+  return { ...resolved, runway: alternate.plannedRunway, approxCourse: course, approx: true, at: liveMetar.fetchedAt };
 }

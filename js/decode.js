@@ -77,6 +77,23 @@ export function fmtZulu(date) {
   return `${String(date.getUTCHours()).padStart(2, '0')}${String(date.getUTCMinutes()).padStart(2, '0')}Z`;
 }
 
+/**
+ * The same instant read at an airport's own clock, for the two moments a
+ * schedule is actually planned around -- boarding at one field, arriving at
+ * another -- where Zulu is correct but not what either field's clock says.
+ *
+ * Takes the UTC offset in hours directly (SimBrief hands one over per
+ * airport, so there is nothing to look up) rather than a timezone name: no
+ * IANA database, no DST table, just the number the OFP already carries. That
+ * also means it will not itself notice a DST change the OFP's own figure
+ * didn't account for -- it is exactly as current as the plan is.
+ */
+export function fmtLocal(date, offsetHours) {
+  if (!(date instanceof Date) || Number.isNaN(date.getTime()) || !Number.isFinite(offsetHours)) return null;
+  const shifted = new Date(date.getTime() + offsetHours * 3600000);
+  return `${String(shifted.getUTCHours()).padStart(2, '0')}${String(shifted.getUTCMinutes()).padStart(2, '0')} LT`;
+}
+
 export function fmtZuluDate(date) {
   if (!(date instanceof Date) || Number.isNaN(date.getTime())) return '—';
   const d = String(date.getUTCDate()).padStart(2, '0');

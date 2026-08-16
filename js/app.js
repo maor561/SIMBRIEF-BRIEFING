@@ -30,7 +30,8 @@ import {
   phaseElapsed,
   dueCheckpoint,
   setPromptMode,
-  dueAlert
+  dueAlert,
+  markAlertSeen
 } from './timeline.js';
 
 const STORAGE_USER = 'sbb.username';
@@ -246,7 +247,11 @@ function renderChapter({ preserveScroll = false } = {}) {
   if (chapter.id === 'atc') ensureVatsim();
   // Performance wants it too: the live wind is what its takeoff figures get
   // compared against.
-  if (chapter.id === 'weather' || chapter.id === 'performance') ensureLiveMetar();
+  // Overview needs it too, now that the divert panel shows the alternate's
+  // live wind alongside the fuel arithmetic.
+  if (chapter.id === 'weather' || chapter.id === 'performance' || chapter.id === 'overview') {
+    ensureLiveMetar();
+  }
   // Masonry moves card nodes into freshly built row/column wrappers, so it
   // must run on the flat list renderChapter just produced -- calling it
   // again on an already-laid-out tree would nest wrappers instead of
@@ -384,7 +389,7 @@ async function ensureLiveMetar() {
   state.findings = analyze(state.model, state.liveMetar);
   renderRail();
 
-  if (state.chapter === 'weather' || state.chapter === 'performance') {
+  if (state.chapter === 'weather' || state.chapter === 'performance' || state.chapter === 'overview') {
     renderChapter({ preserveScroll: true });
   }
 }
@@ -590,7 +595,7 @@ document.addEventListener('click', (event) => {
 
     case 'alert-dismiss': {
       const node = document.getElementById('alert');
-      if (node?.dataset.key) seenAlerts.add(node.dataset.key);
+      if (node?.dataset.key) state.timeline = markAlertSeen(state.model, node.dataset.key);
       node.hidden = true;
       node.innerHTML = '';
       delete node.dataset.key;
@@ -1035,16 +1040,29 @@ addEventListener('resize', closeGlossary, { passive: true });
  *
  * A banner rather than the centred dialog the fuel prompt uses: these carry no
  * question, so blocking the screen for them would be rude. They are dismissed
- * by tapping, and never raised twice for the same milestone.
+ * by tapping, and never raised twice for the same milestone -- "seen" is read
+ * from the timeline's own persisted store (see markAlertSeen in timeline.js)
+ * rather than a local Set, so a dismissal survives a reload instead of
+ * bringing the same alert back the moment the page reopens.
  */
-const seenAlerts = new Set();
-
 function updateAlert() {
   const node = document.getElementById('alert');
   if (!node || !state.model) return;
 
-  const due = dueAlert(state.model, state.timeline, seenAlerts);
-  if (!due) return;
+  const seen = new Set(state.timeline.seenAlerts || []);
+  const due = dueAlert(state.model, state.timeline, seen);
+
+  if (!due) {
+    // The window for whatever was showing has closed. Left alone, an
+    // undismissed banner would sit there for the rest of the flight.
+    if (!node.hidden) {
+      node.hidden = true;
+      node.innerHTML = '';
+      delete node.dataset.key;
+    }
+    return;
+  }
+
   if (node.dataset.key === due.key) return;
 
   node.dataset.key = due.key;

@@ -11,11 +11,12 @@
  */
 
 import { t } from '../i18n.js';
-import { escapeHtml, fmtNumber, fmtDuration, fmtZulu } from '../decode.js';
+import { escapeHtml, fmtNumber, fmtDuration, fmtZulu, fmtLocal } from '../decode.js';
 import { icon, section, findingsList } from '../ui.js';
 import { dominantCruiseAltitude } from '../charts.js';
 import { getActuals } from '../fuellog.js';
-import { SEVERITY } from '../analyze.js';
+import { SEVERITY, THRESHOLDS } from '../analyze.js';
+import { alternateWind } from '../wind.js';
 import {
   PHASES,
   PHASE_KEYS,
@@ -27,7 +28,7 @@ import {
   diversionNow
 } from '../timeline.js';
 
-export default function renderOverview({ model, findings, timeline }) {
+export default function renderOverview({ model, findings, timeline, liveMetar }) {
   const critical = findings.filter((f) => f.severity === SEVERITY.CRITICAL).length;
   const clock = rebasedTimes(model, timeline);
 
@@ -48,7 +49,7 @@ export default function renderOverview({ model, findings, timeline }) {
       ${section(t('common.route'), 'routeSwap', routeBody(model))}
       ${
         model.alternates.length
-          ? section(t('ov.diversion'), 'airspace', diversionBody(model, timeline, getActuals(model)), {
+          ? section(t('ov.diversion'), 'airspace', diversionBody(model, timeline, getActuals(model), liveMetar), {
               action: `<span class="sect-flag">${escapeHtml(model.alternates.map((a) => a.icao).join(' · '))}</span>`
             })
           : ''
@@ -274,13 +275,23 @@ function scheduleBand(model, timeline) {
     return null;
   };
 
+  // Zulu is what the plan is written in; the local line beside it is what
+  // either field's own clock says, so it is skipped whenever the offset is
+  // zero -- there the two would just be the same number printed twice.
+  const originTz = model.origin?.timezone;
+  const destTz = model.destination?.timezone;
+
   const labels = marks
     .map((m) => {
       const actual = actualFor(m.key);
+      const tz = m.key === 'eta' || m.key === 'sta' ? destTz : originTz;
+      const local = Number.isFinite(tz) && tz !== 0 ? fmtLocal(actual || m.time, tz) : null;
+
       return `<span class="sched-mark${actual ? ' has-actual' : ''}" style="--x:${pct(m.x, VB_W)}">
         <i>${escapeHtml(t(`ov.${m.key}`))}</i>
         <b class="ltr">${escapeHtml(fmtZulu(m.time))}</b>
         ${actual ? `<u class="ltr">${escapeHtml(fmtZulu(actual))}</u>` : ''}
+        ${local ? `<small class="ltr">${escapeHtml(local)}</small>` : ''}
       </span>`;
     })
     .join('');
@@ -572,7 +583,7 @@ function documentsSection(model) {
  * would otherwise do on a knee-board, and the number that decides whether the
  * alternate is still an option.
  */
-function divertNowPanel(now, units) {
+function divertNowPanel(now, units, wind) {
   if (!now) return '';
 
   const tone = !now.viable ? 'bad' : now.margin < 400 ? 'warn' : 'good';
@@ -599,6 +610,7 @@ function divertNowPanel(now, units) {
         <b class="ltr ${tone}">${sign}${fmtNumber(Math.abs(now.margin))} ${units}</b>
       </div>
     </div>
+    ${wind ? divertWindLine(wind) : ''}
     ${
       now.viable
         ? ''
@@ -607,15 +619,57 @@ function divertNowPanel(now, units) {
   </div>`;
 }
 
-function diversionBody(model, timeline, actuals) {
+/**
+ * The live wind at the alternate's planned runway, folded into the same
+ * divert panel as the fuel arithmetic -- it is read at the same moment, for
+ * the same decision.
+ *
+ * Always captioned "approx.": unlike the takeoff/landing wind compare, this
+ * is resolved against a runway heading read off its number rather than
+ * SimBrief's own course figure, so it is never shown with that same
+ * confidence.
+ */
+function divertWindLine(wind) {
+  const tone = crosswindTone(wind.worstCrosswind);
+
+  return `<div class="divert-wind">
+    <span class="k">${escapeHtml(t('ov.windAt'))}</span>
+    <span class="v ltr">${windText(wind)}</span>
+    <span class="v ltr ${tone}">${alongCrossText(wind)}</span>
+    <span class="approx">${escapeHtml(t('ov.approxRwy'))} ${escapeHtml(wind.runway)}</span>
+  </div>`;
+}
+
+function crosswindTone(value) {
+  if (!Number.isFinite(value)) return '';
+  if (value >= THRESHOLDS.crosswindCritical) return 'bad';
+  if (value >= THRESHOLDS.crosswindCaution) return 'warn';
+  return 'good';
+}
+
+function windText(wind) {
+  if (wind.calm) return 'CALM';
+  if (wind.variable) return `VRB ${wind.speed ?? '—'} kt`;
+  const gust = wind.gustSpeed ? `G${wind.gustSpeed}` : '';
+  return escapeHtml(`${String(wind.direction).padStart(3, '0')}° / ${wind.speed}${gust} kt`);
+}
+
+function alongCrossText(wind) {
+  if (wind.calm || wind.variable) return '—';
+  const sense = wind.headwind < 0 ? t('to.tailShort') : t('to.headShort');
+  return `${Math.abs(wind.headwind)} ${sense} · ${wind.worstCrosswind} ${escapeHtml(t('to.crosswind'))}`;
+}
+
+function diversionBody(model, timeline, actuals, liveMetar) {
   const units = model.units === 'lbs' ? 'lb' : 'kg';
-  const now = diversionNow(model, timeline, actuals);
 
   return model.alternates
     .map((alternate, i) => {
       // SimBrief only routes to the first alternate, so only that one can
       // show a track; any further alternates carry their own figures alone.
       const legs = i === 0 ? model.alternateNavlog : [];
+      const now = diversionNow(model, timeline, actuals, Date.now(), alternate);
+      const wind = alternateWind(alternate, liveMetar);
 
       return `
         ${i ? '<div class="sub-head"></div>' : ''}
@@ -631,7 +685,7 @@ function diversionBody(model, timeline, actuals) {
           ${fig(t('arr.altnCruise'), alternate.cruiseAltitude ? `FL${Math.round(alternate.cruiseAltitude / 100)}` : '—')}
         </div>
 
-        ${i === 0 ? divertNowPanel(now, units) : ''}
+        ${divertNowPanel(now, units, wind)}
 
         <div class="sect-fields">
           ${field(t('common.runway'), alternate.plannedRunway)}

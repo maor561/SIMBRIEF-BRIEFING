@@ -233,6 +233,8 @@ const STRINGS = {
   'ov.fromLog': 'from the fuel log',
   'ov.fromPlan': 'from the plan',
   'ov.divertShort': 'The diversion no longer closes with the final reserve intact.',
+  'ov.windAt': 'Wind at',
+  'ov.approxRwy': 'approx. · rwy',
   'common.close': 'Close',
 
   'nl.due.toc': 'Top of climb',
