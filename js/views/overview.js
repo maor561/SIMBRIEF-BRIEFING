@@ -275,23 +275,13 @@ function scheduleBand(model, timeline) {
     return null;
   };
 
-  // Zulu is what the plan is written in; the local line beside it is what
-  // either field's own clock says, so it is skipped whenever the offset is
-  // zero -- there the two would just be the same number printed twice.
-  const originTz = model.origin?.timezone;
-  const destTz = model.destination?.timezone;
-
   const labels = marks
     .map((m) => {
       const actual = actualFor(m.key);
-      const tz = m.key === 'eta' || m.key === 'sta' ? destTz : originTz;
-      const local = Number.isFinite(tz) && tz !== 0 ? fmtLocal(actual || m.time, tz) : null;
-
       return `<span class="sched-mark${actual ? ' has-actual' : ''}" style="--x:${pct(m.x, VB_W)}">
         <i>${escapeHtml(t(`ov.${m.key}`))}</i>
         <b class="ltr">${escapeHtml(fmtZulu(m.time))}</b>
         ${actual ? `<u class="ltr">${escapeHtml(fmtZulu(actual))}</u>` : ''}
-        ${local ? `<small class="ltr">${escapeHtml(local)}</small>` : ''}
       </span>`;
     })
     .join('');
@@ -484,12 +474,22 @@ function paxFigure(model) {
   return Number.isFinite(seats) && seats > 0 ? `${fmtNumber(pax)} / ${fmtNumber(seats)}` : fmtNumber(pax);
 }
 
+/**
+ * A live clock under each field's name, ticking off the airport's own UTC
+ * offset rather than any milestone -- the crew's own watch, not a plan
+ * figure. `data-tz` carries the offset so app.js can repaint it every
+ * minute without re-rendering the chapter.
+ */
 function port(airport, side) {
   if (!airport) return '<span></span>';
   const iata = airport.iata ? `${airport.iata} - ` : '';
+  const tz = airport.timezone;
+  const clock = Number.isFinite(tz) ? fmtLocal(new Date(), tz) : null;
+
   return `<div class="sched-port ${side}">
     <b class="ltr">${escapeHtml(airport.icao || '—')}</b>
     <span>${escapeHtml(`${iata}${airport.name || ''}`)}</span>
+    ${clock ? `<em class="port-clock ltr" data-port-clock="${tz}">${escapeHtml(clock)}</em>` : ''}
   </div>`;
 }
 

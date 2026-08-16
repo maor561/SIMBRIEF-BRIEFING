@@ -1113,6 +1113,19 @@ table.fuelcheck-table .dim { color: var(--dimmer); }
   text-transform: uppercase;
 }
 
+/* The field's own clock, running live rather than sitting on a milestone --
+ * quieter than the name above it, since it is context rather than a figure
+ * from the plan. */
+.port-clock {
+  display: block;
+  margin-block-start: 6px;
+  font-family: var(--mono);
+  font-style: normal;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--blue);
+}
+
 .sched-callsign {
   align-self: center;
   text-align: center;
@@ -1313,17 +1326,6 @@ table.fuelcheck-table .dim { color: var(--dimmer); }
   font-weight: 700;
   color: var(--blue);
   text-decoration: none;
-}
-
-/* The local-time line: same clock, whichever field's it is, sitting quieter
- * than Zulu since Zulu is what the plan is actually written in. */
-.sched-mark small {
-  display: block;
-  margin-block-start: 1px;
-  font-family: var(--mono);
-  font-size: 10.5px;
-  font-weight: 600;
-  color: var(--dimmer);
 }
 
 /* -------------------------------------------------------- flight report */

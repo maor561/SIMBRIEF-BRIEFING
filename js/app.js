@@ -6,7 +6,7 @@
 import { t } from './i18n.js';
 import { normalizeOfp } from './normalize.js';
 import { analyze, countByChapter, SEVERITY } from './analyze.js';
-import { escapeHtml, fmtZulu, fmtDuration, fmtNumber } from './decode.js';
+import { escapeHtml, fmtZulu, fmtDuration, fmtNumber, fmtLocal } from './decode.js';
 import { getNotamFilter, notamControls, notamListMarkup } from './ui.js';
 import { layoutMasonry } from './masonry.js';
 
@@ -800,6 +800,13 @@ document.addEventListener('keydown', (event) => {
 setInterval(() => {
   const clock = document.getElementById('clock');
   if (clock) clock.textContent = fmtZulu(new Date());
+
+  // Each field's own clock beside its name, ticking off the offset baked
+  // into the mark rather than anything re-render would have to recompute.
+  const now = new Date();
+  for (const node of document.querySelectorAll('[data-port-clock]')) {
+    node.textContent = fmtLocal(now, Number(node.dataset.portClock));
+  }
 }, 10000);
 
 /*
