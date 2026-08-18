@@ -31,7 +31,8 @@ import {
   dueCheckpoint,
   setPromptMode,
   dueAlert,
-  markAlertSeen
+  markAlertSeen,
+  actualOff
 } from './timeline.js';
 
 const STORAGE_USER = 'sbb.username';
@@ -77,7 +78,14 @@ const state = {
   // baseline so the screen still works with no network.
   liveMetar: null,
   // Turnaround phases and the real wheels-up time, once the crew marks it.
-  timeline: { phases: {}, current: null }
+  timeline: { phases: {}, current: null },
+  // When the OFP-refresh check last ran, and the generatedAt of a newer OFP
+  // once seen -- the latter remembered so dismissing it does not just bring
+  // it back on the next sweep.
+  ofpCheckedAt: 0,
+  ofpUpdate: null,
+  ofpDismissed: null,
+  checkingOfp: false
 };
 
 const el = {
@@ -132,6 +140,13 @@ async function load({ username, demo = false } = {}) {
     state.chapter = 'overview';
     state.vatsim = null;
     state.liveMetar = null;
+
+    // Whatever this load just fetched is by definition the newest copy, so
+    // any pending "new OFP" notice from before is stale news now.
+    state.ofpCheckedAt = Date.now();
+    state.ofpUpdate = null;
+    state.ofpDismissed = null;
+    updateOfpAlert();
 
     el.overlay.hidden = true;
     el.app.hidden = false;
@@ -335,6 +350,7 @@ setInterval(() => {
   // A lock refused earlier -- before the first tap, or by a device that was
   // busy at the time -- is worth asking for again while the briefing is up.
   keepAwake();
+  checkForNewOfp();
 }, FRESHNESS_TICK_MS);
 // Coming back to the tab is the moment the figures are about to be read, so
 // the age check runs then too rather than waiting for the next tick.
@@ -343,7 +359,71 @@ document.addEventListener('visibilitychange', () => {
   refreshStaleFeeds();
   // The wake lock does not survive being hidden, so it is taken again here.
   keepAwake();
+  checkForNewOfp();
 });
+
+/* --------------------------------------------------------------- ofp update */
+
+const OFP_CHECK_INTERVAL_MS = 5 * 60 * 1000;
+
+/**
+ * Polls for a newer OFP than the one loaded, so a dispatcher's revision does
+ * not go unnoticed until the crew happens to hit refresh themselves.
+ *
+ * Skipped once wheels-up is stamped: from there this app has no way to act
+ * on a re-dispatch anyway, and the banner would just be noise during a busy
+ * phase. Skipped for the demo, which never changes, and while a check is
+ * already in flight or the last one is still recent -- this rides the same
+ * sweep as the live-feed freshness check, so it needs its own throttle.
+ */
+async function checkForNewOfp() {
+  if (state.demo || !state.username || !state.model || document.hidden) return;
+  if (state.checkingOfp || actualOff(state.timeline)) return;
+  if (Date.now() - state.ofpCheckedAt < OFP_CHECK_INTERVAL_MS) return;
+
+  state.checkingOfp = true;
+  try {
+    const raw = await fetchOfp(state.username);
+    const generated = Number(raw?.params?.time_generated) * 1000;
+    state.ofpCheckedAt = Date.now();
+
+    if (
+      Number.isFinite(generated) &&
+      generated > 0 &&
+      generated !== state.model.generatedAt?.getTime() &&
+      generated !== state.ofpDismissed
+    ) {
+      state.ofpUpdate = generated;
+      updateOfpAlert();
+    }
+  } catch {
+    // A failed background check is not worth surfacing -- the crew has not
+    // asked for anything, so there is nothing to apologise for. The next
+    // sweep tries again.
+  } finally {
+    state.checkingOfp = false;
+  }
+}
+
+function updateOfpAlert() {
+  const node = document.getElementById('ofp-alert');
+  if (!node) return;
+
+  if (!state.ofpUpdate) {
+    node.hidden = true;
+    node.innerHTML = '';
+    return;
+  }
+
+  node.hidden = false;
+  node.innerHTML = `<div class="alert-card">
+    <button class="alert-key ofp-reload-btn" type="button" data-action="ofp-reload">
+      ${escapeHtml(t('ofp.updated'))}
+      <b class="ltr">${escapeHtml(t('ofp.reload'))}</b>
+    </button>
+    <button class="alert-close" data-action="ofp-dismiss" aria-label="${escapeHtml(t('common.close'))}">✕</button>
+  </div>`;
+}
 
 /** Briefly swaps a button's label to confirm what just happened. */
 function flash(button, message) {
@@ -632,6 +712,18 @@ document.addEventListener('click', (event) => {
       delete node.dataset.key;
       break;
     }
+
+    case 'ofp-reload':
+      load({ username: state.username });
+      break;
+
+    // Remembers this particular OFP's generatedAt so the same revision does
+    // not reappear on the next sweep -- a genuinely newer one still will.
+    case 'ofp-dismiss':
+      state.ofpDismissed = state.ofpUpdate;
+      state.ofpUpdate = null;
+      updateOfpAlert();
+      break;
 
     case 'glossary-close':
       closeGlossary();

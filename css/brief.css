@@ -1713,6 +1713,28 @@ table.fuelcheck-table .dim { color: var(--dimmer); }
   line-height: 1;
 }
 
+/* Sits below a milestone alert rather than on top of it -- both are rare,
+ * but a dispatcher revising the plan right around STD is not impossible. */
+.ofp-alert {
+  inset-block-start: 70px;
+}
+
+.alert-key.ofp-reload-btn {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--blue);
+  font: inherit;
+  cursor: pointer;
+}
+
+.alert-key.ofp-reload-btn b {
+  display: block;
+  margin-block-start: 2px;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
 /* ------------------------------------------------------------- divert now */
 
 /*

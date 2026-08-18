@@ -224,6 +224,9 @@ const STRINGS = {
   'alert.blockedTitle': 'Notifications blocked — enable them in your browser’s site settings to turn alerts back on.',
   'alert.blockedFlash': 'Blocked',
 
+  'ofp.updated': 'New OFP available',
+  'ofp.reload': 'Reload',
+
   'install.add': 'Install as an app',
   'manual.open': 'User manual',
   'install.manual': 'Use Share ▸ Add to Home Screen',
