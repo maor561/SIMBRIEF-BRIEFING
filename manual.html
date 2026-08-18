@@ -333,6 +333,7 @@
   .d-ports span { display: block; font-size: 8px; color: var(--dimmer); text-transform: uppercase; }
   .d-ports .mid { text-align: center; }
   .d-ports .mid b { font-size: 11px; }
+  .d-ports i { display: block; font-style: normal; font-size: 9px; font-weight: 700; color: var(--accent); margin-top: 4px; }
 
   .d-phases { display: flex; gap: 8px; margin-top: 10px; }
   .d-phase {
@@ -538,9 +539,9 @@
         <div class="frame-label"><span>schedule &middot; mid-flight</span><span>diagram</span></div>
         <div class="frame-body">
           <div class="d-ports">
-            <div><b>LEBL</b><span>Barcelona</span></div>
+            <div><b>LEBL</b><span>Barcelona</span><i>1930 LT</i></div>
             <div class="mid"><b>ELY2569</b></div>
-            <div style="text-align:right"><b>LCLK</b><span>Larnaca</span></div>
+            <div style="text-align:right"><b>LCLK</b><span>Larnaca</span><i>2030 LT</i></div>
           </div>
           <div class="d-curve">
             <svg viewBox="0 0 500 100" preserveAspectRatio="none">
@@ -562,9 +563,10 @@
           <h4>On this screen</h4>
           <ul>
             <li><b>Schedule curve</b> &mdash; STD/ETD/ETOT before departure, ETA/STA after. Once airborne, real times sit beside the planned ones with the delta between them.</li>
+            <li><b>Live local clock</b> &mdash; under each field's name, ticking in real time off that airport's own UTC offset &mdash; the crew's own watch, not a plan figure.</li>
             <li><b>Takeoff / Landing tiles</b> &mdash; one tap each. Pressing <b>Airborne</b> rebases every time in the whole briefing off the real wheels-up.</li>
             <li><b>Dispatch, Route, Documents</b> &mdash; crew, aircraft, filed route and a link to the original OFP PDF.</li>
-            <li><b>Diversion</b> &mdash; the alternate's own figures, plus an <b>&ldquo;if you divert now&rdquo;</b> panel once you're flying (see below).</li>
+            <li><b>Diversion</b> &mdash; every filed alternate gets its own figures, live wind on its planned runway, and an <b>&ldquo;if you divert now&rdquo;</b> panel once you're flying (see below).</li>
             <li><b>Watch items</b> &mdash; every exception the app has flagged, worst first, moved to the bottom so it's the last thing you check before pushback.</li>
           </ul>
         </div>
@@ -582,6 +584,12 @@
           <div class="d-row"><span class="k">Fuel on board</span><span></span><span class="n">6,350 kg</span></div>
           <div class="d-row"><span class="k">Would land at LCPH</span><span></span><span class="n">5,147 kg</span></div>
           <div class="d-row"><span class="k">Over final reserve</span><span></span><span class="n amber">+4,027 kg</span></div>
+          <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--line);font-family:var(--mono);font-size:10px">
+            <span style="color:var(--dimmer);text-transform:uppercase;letter-spacing:.05em">Wind at</span>
+            <span style="margin-left:6px;font-weight:700">310&deg; / 7 kt</span>
+            <span style="margin-left:8px">7 TAIL &middot; 2 crosswind</span>
+            <div style="margin-top:3px;font-style:italic;color:var(--dimmer);font-size:9px">approx. &middot; rwy 11</div>
+          </div>
         </div>
       </div>
       <div class="sec-notes">
@@ -590,6 +598,8 @@
           <ul>
             <li>Uses your <b>latest logged fuel reading</b> when there is one, the plan's figure for your current position when there isn't &mdash; and always says which.</li>
             <li><b>Over final reserve</b> is what's left after landing at the alternate with reserve fuel still intact. It turns red the moment a diversion stops closing.</li>
+            <li>If more than one alternate is filed, <b>each gets its own panel</b> &mdash; the fuel math and wind are never only shown for the first.</li>
+            <li><b>Wind at</b> the alternate is a live METAR resolved onto its planned runway. It's always marked <b>approx.</b> because it's read off the runway's number rather than SimBrief's own course figure &mdash; good enough to see a crosswind that's turned into a problem, not the number to fly an approach off.</li>
           </ul>
         </div>
       </div>
@@ -889,6 +899,7 @@
           <ul>
             <li>A banner and a chime for off-blocks, wheels-up and top of descent, timed off the real clock.</li>
             <li>Turn on the bell in the rail to also mirror it to your system notification tray.</li>
+            <li>Dismissing one sticks &mdash; it stays dismissed even if the page reloads mid-flight &mdash; and a banner you never dismiss hides itself once its own window has passed.</li>
           </ul>
         </div>
         <div>

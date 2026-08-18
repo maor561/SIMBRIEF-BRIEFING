@@ -27,7 +27,8 @@ import { section, icon, meter, categoryDot, findingsList } from '../ui.js';
 import { fuelCurve } from '../charts.js';
 import { getActuals, classify, summarise } from '../fuellog.js';
 import { rebasedTimes, actualOff, actualOn, phaseState } from '../timeline.js';
-import { runwayWind } from '../wind.js';
+import { runwayWind, alternateWind } from '../wind.js';
+import { diffCell } from './navlog.js';
 
 export default function renderReport({ model, findings, timeline, liveMetar }) {
   const clock = rebasedTimes(model, timeline);
@@ -334,15 +335,13 @@ function fuelLogBody(model, actuals) {
     <tbody>${logged
       .map((fix) => {
         const actual = actuals[fix.index];
-        const { state, diff } = classify(fix, actual, model.fuel.contingency);
-        const tone = { onPlan: 'good', under: 'warn', overBurn: 'bad', belowMin: 'bad' }[state] || '';
-        const sign = diff > 0 ? '+' : diff < 0 ? '−' : '';
+        const { state, diff } = classify(fix, actual, model.fuel.contingency, model.fuel.planRamp);
         return `<tr>
           <td><b>${escapeHtml(fix.ident)}</b></td>
           <td>${Number.isFinite(fix.timeTotal) ? fmtDuration(fix.timeTotal) : '—'}</td>
           <td class="dim">${fmtNumber(fix.fuelOnBoard)}</td>
           <td>${fmtNumber(actual)}</td>
-          <td><span class="fuel-diff ${tone}">${diff === null ? '—' : `${sign}${fmtNumber(Math.abs(diff))}`}</span></td>
+          <td>${diffCell(state, diff)}</td>
         </tr>`;
       })
       .join('')}</tbody>
@@ -365,11 +364,36 @@ function weightsBody(model) {
 /* ----------------------------------------------------------------- weather */
 
 /**
- * What the weather actually was at each end. The live observation is preferred
- * over the OFP's snapshot, since by landing the snapshot is hours old.
+ * What the weather actually was at each end -- and, if a diversion ever
+ * became live, at every filed alternate too. The live observation is
+ * preferred over the OFP's snapshot, since by landing the snapshot is hours
+ * old.
  */
 function weatherBody(model, liveMetar) {
   const live = liveMetar?.state === 'ready' ? liveMetar.metars : {};
+
+  const card = (airport, role, raw, category, wind) => `<div class="rep-wx">
+    <div class="rep-wx-head">
+      ${categoryDot(category)}
+      <span class="role">${escapeHtml(role)}</span>
+      <span class="icao ltr">${escapeHtml(airport.icao)}</span>
+      ${live[airport.icao] ? `<span class="wxrow-age live">${escapeHtml(t('wx.live'))}</span>` : ''}
+      ${
+        wind && !wind.calm && !wind.variable
+          ? `<span class="grow"></span>
+             <span class="rep-wx-wind ltr">${escapeHtml(
+               `${Math.abs(wind.headwind)}kt ${wind.headwind < 0 ? t('to.tailShort') : t('to.headShort')} · ${wind.crosswind}kt ${t('to.crosswind')}`
+             )}</span>`
+          : ''
+      }
+    </div>
+    ${
+      wind?.approx
+        ? `<div class="rep-wx-approx">${escapeHtml(t('ov.approxRwy'))} ${escapeHtml(wind.runway)}</div>`
+        : ''
+    }
+    <div class="wxrow-text">${highlightWx(raw)}</div>
+  </div>`;
 
   const block = (airport, role, runway) => {
     if (!airport) return '';
@@ -379,24 +403,21 @@ function weatherBody(model, liveMetar) {
     const parsed = parseMetar(raw);
     const category = live[airport.icao] ? flightCategory(parsed) : airport.metarCategory;
     const wind = runway ? runwayWind(runway, parsed) : null;
+    return card(airport, role, raw, category, wind);
+  };
 
-    return `<div class="rep-wx">
-      <div class="rep-wx-head">
-        ${categoryDot(category)}
-        <span class="role">${escapeHtml(role)}</span>
-        <span class="icao ltr">${escapeHtml(airport.icao)}</span>
-        ${live[airport.icao] ? `<span class="wxrow-age live">${escapeHtml(t('wx.live'))}</span>` : ''}
-        ${
-          wind && !wind.calm && !wind.variable
-            ? `<span class="grow"></span>
-               <span class="rep-wx-wind ltr">${escapeHtml(
-                 `${Math.abs(wind.headwind)}kt ${wind.headwind < 0 ? t('to.tailShort') : t('to.headShort')} · ${wind.crosswind}kt ${t('to.crosswind')}`
-               )}</span>`
-            : ''
-        }
-      </div>
-      <div class="wxrow-text">${highlightWx(raw)}</div>
-    </div>`;
+  // No trueCourse exists for an alternate's runway -- SimBrief never computes
+  // a full TLR for it -- so the wind here comes from alternateWind(), read
+  // off the runway's own number and always captioned approximate rather than
+  // shown with the same confidence as the takeoff/landing figures above.
+  const altBlock = (airport, role) => {
+    if (!airport) return '';
+    const raw = live[airport.icao] || airport.metar;
+    if (!raw) return '';
+
+    const parsed = parseMetar(raw);
+    const category = live[airport.icao] ? flightCategory(parsed) : airport.metarCategory;
+    return card(airport, role, raw, category, alternateWind(airport, liveMetar));
   };
 
   const takeoffRwy = model.tlr.takeoff?.runways.find(
@@ -410,7 +431,9 @@ function weatherBody(model, liveMetar) {
     model.destination,
     t('arr.title'),
     landingRwy
-  )}`;
+  )}${model.alternates
+    .map((a, i) => altBlock(a, model.alternates.length > 1 ? `ALTN ${i + 1}` : 'ALTN'))
+    .join('')}`;
 
   return blocks || `<div class="empty-state">${escapeHtml(t('common.notAvailable'))}</div>`;
 }

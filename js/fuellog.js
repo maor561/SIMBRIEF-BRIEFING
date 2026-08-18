@@ -68,13 +68,23 @@ export function clearActuals(model) {
  * `diff` is actual minus planned, so negative means burning faster than
  * forecast. Below the fix's own minimum-on-board is the serious one -- that
  * is the figure that already accounts for reserve and alternate.
+ *
+ * Checked before any of that: whether the reading is even physically
+ * possible. A fat-fingered entry (one digit too many, a stray leading digit)
+ * lands inside the aircraft's real range often enough that `diff` alone
+ * would just read as an ordinary burn -- onPlan or under, never flagged.
+ * `maxOnBoard` is the fuel actually loaded at the ramp, the most any reading
+ * during this flight could honestly be; nothing can be negative either.
  */
-export function classify(fix, actual, contingency) {
+export function classify(fix, actual, contingency, maxOnBoard) {
   if (!Number.isFinite(actual)) return { state: 'none', diff: null };
 
   const planned = fix.fuelOnBoard;
   const diff = Number.isFinite(planned) ? actual - planned : null;
 
+  if (actual < 0 || (Number.isFinite(maxOnBoard) && actual > maxOnBoard)) {
+    return { state: 'implausible', diff };
+  }
   if (Number.isFinite(fix.fuelMinOnBoard) && actual < fix.fuelMinOnBoard) {
     return { state: 'belowMin', diff };
   }
@@ -91,15 +101,20 @@ export function classify(fix, actual, contingency) {
  */
 export function summarise(model, actuals) {
   const contingency = model.fuel.contingency;
+  const maxOnBoard = model.fuel.planRamp;
   const entries = model.navlog
     .filter((fix) => Number.isFinite(actuals[fix.index]))
-    .map((fix) => ({ fix, actual: actuals[fix.index], ...classify(fix, actuals[fix.index], contingency) }));
+    .map((fix) => ({
+      fix,
+      actual: actuals[fix.index],
+      ...classify(fix, actuals[fix.index], contingency, maxOnBoard)
+    }));
 
   if (!entries.length) {
     return { count: 0, state: 'none', worst: null, latest: null, contingency };
   }
 
-  const rank = { onPlan: 0, under: 1, overBurn: 2, belowMin: 3 };
+  const rank = { onPlan: 0, under: 1, overBurn: 2, belowMin: 3, implausible: 4 };
   const worst = entries.reduce((a, b) => (rank[b.state] > rank[a.state] ? b : a));
   const latest = entries[entries.length - 1];
 

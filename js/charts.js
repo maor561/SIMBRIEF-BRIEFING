@@ -441,7 +441,7 @@ export function fuelCurve(model, actuals = {}) {
 
   const actualDots = logged
     .map((p) => {
-      const { state } = classify(p.fix, p.actual, model.fuel.contingency);
+      const { state } = classify(p.fix, p.actual, model.fuel.contingency, model.fuel.planRamp);
       const colour =
         state === 'onPlan' ? 'var(--green)' : state === 'under' ? 'var(--amber)' : 'var(--red)';
       return `<circle class="fuel-actual-dot" cx="${x(p.i).toFixed(1)}" cy="${y(p.actual).toFixed(1)}" r="3.6"

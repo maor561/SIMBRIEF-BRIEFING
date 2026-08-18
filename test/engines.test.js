@@ -30,6 +30,7 @@ import {
 } from '../js/decode.js';
 import { runwayWind, estimateRunwayCourse, alternateWind } from '../js/wind.js';
 import { notamKey, isRead, markRead, markUnread, unreadCount } from '../js/notamlog.js';
+import { classify } from '../js/fuellog.js';
 import { decodeWxToken, decodeNotamToken, decodeToken } from '../js/glossary.js';
 import { aircraftPoint } from '../js/views/overview.js';
 import { clockDelta } from '../js/views/report.js';
@@ -767,6 +768,31 @@ check('prices whichever alternate it is asked about, not only the first', () => 
 
   // No default silently prices the first alternate for anyone who omits it.
   assert.equal(diversionNow(model, timeline, {}, off + 3600 * 1000).icao, model.alternates[0].icao);
+});
+
+check('flags a fuel reading nothing on the aircraft could actually produce', () => {
+  const fix = model.navlog.find((f) => Number.isFinite(f.fuelOnBoard) && Number.isFinite(f.fuelMinOnBoard));
+  const ramp = model.fuel.planRamp;
+
+  // A fat-fingered zero too many: comfortably "on plan" by the numbers alone,
+  // but more fuel than the aircraft ever had on board.
+  const tooMuch = classify(fix, ramp * 10, model.fuel.contingency, ramp);
+  assert.equal(tooMuch.state, 'implausible');
+
+  // Negative has no honest reading behind it either.
+  assert.equal(classify(fix, -50, model.fuel.contingency, ramp).state, 'implausible');
+
+  // Checked ahead of belowMin: a wildly wrong number should not read as a
+  // credible (if alarming) low-fuel report.
+  assert.equal(classify(fix, ramp * 5, model.fuel.contingency, ramp).state, 'implausible');
+
+  // A plausible reading is judged as before -- the new check does not
+  // interfere with ordinary values.
+  assert.equal(classify(fix, fix.fuelOnBoard, model.fuel.contingency, ramp).state, 'onPlan');
+
+  // No ramp figure to check against: falls back to the ordinary rules
+  // rather than refusing to classify anything.
+  assert.equal(classify(fix, fix.fuelOnBoard, model.fuel.contingency, undefined).state, 'onPlan');
 });
 
 check('raises the milestones worth interrupting for', () => {

@@ -65,6 +65,8 @@ const STRINGS = {
   'nl.state.under': 'Below plan',
   'nl.state.overBurn': 'Contingency exceeded',
   'nl.state.belowMin': 'Below minimum',
+  'nl.state.implausible': 'Implausible reading',
+  'nl.implausibleHint': 'Outside what this aircraft could physically be carrying — check the figure before trusting it.',
   'nl.fixes': 'fixes',
   'nl.ident': 'Fix',
   'nl.via': 'Via',
@@ -219,6 +221,8 @@ const STRINGS = {
   'alert.on': 'Alerts on',
   'alert.off': 'Alerts off',
   'alert.unsupported': 'Not supported',
+  'alert.blockedTitle': 'Notifications blocked — enable them in your browser’s site settings to turn alerts back on.',
+  'alert.blockedFlash': 'Blocked',
 
   'install.add': 'Install as an app',
   'manual.open': 'User manual',

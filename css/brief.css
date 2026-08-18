@@ -169,6 +169,10 @@ button {
 
 .rail-btn:active { background: var(--panel-3); }
 
+/* The denied-alerts state: present, not hidden, but visibly inert -- there
+ * is nothing left in the app for a tap here to do. */
+.rail-btn.muted { color: var(--dimmer); opacity: 0.6; }
+
 .rail-btn .glyph {
   width: 17px;
   height: 17px;
@@ -629,6 +633,12 @@ table.navlog-table th { padding: 6px 8px; }
 .gl {
   font-weight: 700;
   cursor: pointer;
+}
+
+.gl:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+  border-radius: 2px;
 }
 
 @media (max-width: 640px) {
@@ -1563,6 +1573,15 @@ table.fuelcheck-table .dim { color: var(--dimmer); }
   font-size: 12px;
   font-weight: 600;
   color: var(--dim);
+}
+
+/* Same disclaimer the Overview diversion panel carries for the same reason:
+ * an alternate's wind here is read off its runway number, not a real course. */
+.rep-wx-approx {
+  margin-block-start: 3px;
+  font-size: 9.5px;
+  font-style: italic;
+  color: var(--dimmer);
 }
 
 /* --------------------------------------------------------------- glossary */

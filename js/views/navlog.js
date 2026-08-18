@@ -47,6 +47,7 @@ const STATE_TONE = {
   under: 'warn',
   overBurn: 'bad',
   belowMin: 'bad',
+  implausible: 'bad',
   none: ''
 };
 
@@ -125,7 +126,7 @@ function fuelCheckBody(model, actuals, timeline, leg) {
 
 function fuelRow(model, fix, actuals, timeline, leg, isCheckpoint) {
   const actual = actuals[fix.index];
-  const { state, diff } = classify(fix, actual, model.fuel.contingency);
+  const { state, diff } = classify(fix, actual, model.fuel.contingency, model.fuel.planRamp);
   const eta = fixEta(model, timeline, fix);
 
   // Where the aircraft is now, and which rows are the ones to fill in.
@@ -159,8 +160,18 @@ function fuelRow(model, fix, actuals, timeline, leg, isCheckpoint) {
   </tr>`;
 }
 
-/** Exported so a keystroke can repaint one cell without rebuilding the page. */
+/**
+ * Exported so a keystroke can repaint one cell without rebuilding the page.
+ *
+ * `implausible` is checked before the null-diff bailout: a reading with no
+ * planned figure to diff against (an off-route fix, say) still deserves the
+ * flag, and showing the actual diff number here would just dress up a typo
+ * as an ordinary burn.
+ */
 export function diffCell(state, diff) {
+  if (state === 'implausible') {
+    return `<span class="fuel-diff bad" title="${escapeHtml(t('nl.implausibleHint'))}">⚠ ${escapeHtml(t('nl.state.implausible'))}</span>`;
+  }
   if (state === 'none' || diff === null) return '<span class="fuel-diff">—</span>';
   const tone = STATE_TONE[state] || '';
   const sign = diff > 0 ? '+' : diff < 0 ? '−' : '';

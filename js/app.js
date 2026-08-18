@@ -215,9 +215,27 @@ function renderRail() {
   `;
 }
 
-/** Offered only while there is something to grant; hidden once granted. */
+/**
+ * Offered while there is something to grant, hidden once granted -- and, if
+ * the crew denied it, swapped for a muted state rather than disappearing.
+ *
+ * A denied bell used to just vanish, with nothing left in the rail to say
+ * why or how to undo it. `Notification.requestPermission()` cannot be asked
+ * again once denied -- the browser answers 'denied' without even showing a
+ * prompt -- so the fix is not a retry, it is telling the crew where to look:
+ * the site's own settings in the browser, not this app.
+ */
 function alertsButton() {
-  if (!('Notification' in window) || Notification.permission !== 'default') return '';
+  if (!('Notification' in window)) return '';
+  if (Notification.permission === 'granted') return '';
+
+  if (Notification.permission === 'denied') {
+    const label = escapeHtml(t('alert.blockedTitle'));
+    return `<button class="rail-btn muted" data-action="alerts-blocked" title="${label}" aria-label="${label}">
+      <svg class="glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 15v-4a6 6 0 1 0-12 0v4l-1.6 2.4h15.2zM10 20h4M4 4l16 16"/></svg>
+    </button>`;
+  }
+
   const label = escapeHtml(t('alert.enable'));
   return `<button class="rail-btn" data-action="enable-alerts" title="${label}" aria-label="${label}">
     <svg class="glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 15v-4a6 6 0 1 0-12 0v4l-1.6 2.4h15.2zM10 20h4"/></svg>
@@ -426,6 +444,19 @@ el.form.addEventListener('submit', (event) => {
 
 el.demo.addEventListener('click', () => load({ demo: true }));
 
+// The tokens carry `role="button" tabindex="0"` precisely so this works: a
+// keyboard-only reader tabbing through a METAR/TAF/NOTAM body can reach one
+// and open it the way any other button opens, without a mouse or a touch.
+document.addEventListener('keydown', (event) => {
+  if (event.key !== 'Enter' && event.key !== ' ') return;
+  const token = event.target.closest('[data-gloss]');
+  if (!token) return;
+
+  // Space would otherwise scroll the page under a focused, non-form element.
+  event.preventDefault();
+  toggleGlossary(token);
+});
+
 document.addEventListener('click', (event) => {
   // A METAR/TAF/NOTAM token that decodes. Handled before anything else, and
   // it swallows the click entirely -- a tap that opens the glossary should
@@ -612,6 +643,12 @@ document.addEventListener('click', (event) => {
       requestAlerts(trigger);
       break;
 
+    // Nothing left to ask the browser -- it will not re-prompt once denied
+    // -- so this just points at where the switch actually lives now.
+    case 'alerts-blocked':
+      flash(trigger, t('alert.blockedFlash'));
+      break;
+
     case 'install-app':
       runInstall(trigger);
       break;
@@ -674,7 +711,7 @@ document.addEventListener('input', (event) => {
 
   const cell = document.querySelector(`[data-fuel-diff="${index}"]`);
   if (cell && fix) {
-    const { state: verdict, diff } = classify(fix, actuals[index], state.model.fuel.contingency);
+    const { state: verdict, diff } = classify(fix, actuals[index], state.model.fuel.contingency, state.model.fuel.planRamp);
     cell.innerHTML = diffCell(verdict, diff);
   }
 
@@ -1202,7 +1239,11 @@ async function requestAlerts(trigger) {
   }
   const result = await Notification.requestPermission();
   flash(trigger, result === 'granted' ? t('alert.on') : t('alert.off'));
-  renderRail();
+
+  // renderRail() swaps this very button for its post-permission state
+  // (granted hides it, denied mutes it) -- done immediately, that overwrites
+  // flash()'s text before the tap that caused it even finishes rendering.
+  setTimeout(renderRail, 1600);
 }
 
 /*

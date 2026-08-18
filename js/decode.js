@@ -715,7 +715,7 @@ export function highlightWx(raw, context) {
 
       const classes = [cls, gloss ? 'gl' : null].filter(Boolean).join(' ');
       const attrs = gloss
-        ? ` data-gloss="${context === 'sigmet' ? 'sigmet' : 'wx'}" data-code="${escapeHtml(upper)}"`
+        ? ` data-gloss="${context === 'sigmet' ? 'sigmet' : 'wx'}" data-code="${escapeHtml(upper)}" role="button" tabindex="0"`
         : '';
       return `<span class="${classes}"${attrs}>${escaped}</span>`;
     })
@@ -741,7 +741,7 @@ export function highlightNotam(raw) {
       if (!cls && !gloss) return escaped;
 
       const classes = [cls, gloss ? 'gl' : null].filter(Boolean).join(' ');
-      const attrs = gloss ? ` data-gloss="notam" data-code="${escapeHtml(bare)}"` : '';
+      const attrs = gloss ? ` data-gloss="notam" data-code="${escapeHtml(bare)}" role="button" tabindex="0"` : '';
       return `<span class="${classes}"${attrs}>${escaped}</span>`;
     })
     .join('');
