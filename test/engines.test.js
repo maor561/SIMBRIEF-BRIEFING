@@ -33,6 +33,7 @@ import { notamKey, isRead, markRead, markUnread, unreadCount } from '../js/notam
 import { classify } from '../js/fuellog.js';
 import { decodeWxToken, decodeNotamToken, decodeToken } from '../js/glossary.js';
 import { aircraftPoint } from '../js/views/overview.js';
+import { activeRunway } from '../js/views/performance.js';
 import { clockDelta } from '../js/views/report.js';
 import {
   PHASES,
@@ -524,6 +525,28 @@ check('says nothing about a wind with no direction', () => {
     runwayWind(runway, parseMetar('LEBL 101630Z VRB04KT 9999 20/10 Q1015')).variable,
     true
   );
+});
+
+check('briefs the runway picked, and falls back rather than blanking', () => {
+  const tlr = model.tlr.takeoff;
+  assert.equal(tlr.plannedRunway, '24L', 'the fixture plans 24L');
+
+  // Nothing picked: the planned runway, as before.
+  assert.equal(activeRunway(tlr, null).identifier, '24L');
+
+  // Picked: that runway, with its own figures rather than the planned one's.
+  const other = tlr.runways.find((r) => r.identifier !== '24L');
+  const picked = activeRunway(tlr, other.identifier);
+  assert.equal(picked.identifier, other.identifier);
+  assert.equal(picked.trueCourse, other.trueCourse, 'its own course, so live wind resolves onto it');
+
+  // A pick this OFP no longer has -- a reload can drop a runway -- must not
+  // blank the section.
+  assert.equal(activeRunway(tlr, '99X').identifier, '24L');
+
+  // No TLR at all is null, not a crash.
+  assert.equal(activeRunway(null, '24L'), null);
+  assert.equal(activeRunway({ runways: [] }, null), null);
 });
 
 check('reads a runway number as its approximate heading', () => {

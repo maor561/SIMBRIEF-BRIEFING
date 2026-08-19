@@ -27,11 +27,12 @@ import {
 } from '../ui.js';
 import { THRESHOLDS } from '../analyze.js';
 
-export default function renderPerformance({ model, liveMetar }) {
+export default function renderPerformance({ model, liveMetar, runwayPick = {} }) {
   const takeoff = model.tlr.takeoff;
   const landing = model.tlr.landing;
 
-  const takeoffRunway = takeoff?.runways.find((r) => r.identifier === takeoff.plannedRunway) || takeoff?.runways[0];
+  const takeoffRunway = activeRunway(takeoff, runwayPick.takeoff);
+  const landingRwy = activeRunway(landing, runwayPick.landing);
 
   return `
     <div class="cover">
@@ -44,10 +45,48 @@ export default function renderPerformance({ model, liveMetar }) {
       ${section(
         t('arr.title'),
         'aircraft',
-        landingSection(model, landing, liveWind(model.destination, landingRunway(landing), liveMetar))
+        landingSection(model, landing, landingRwy, liveWind(model.destination, landingRwy, liveMetar))
       )}
     </div>
   `;
+}
+
+/**
+ * Which runway the section is briefing: the one picked, or the planned one.
+ *
+ * A pick that no longer exists falls back rather than blanking the section --
+ * reloading a regenerated OFP can drop a runway from the list, and the
+ * briefing must still open on something real.
+ */
+export function activeRunway(tlr, pick) {
+  if (!tlr?.runways?.length) return null;
+  return (
+    (pick && tlr.runways.find((r) => r.identifier === pick)) ||
+    tlr.runways.find((r) => r.identifier === tlr.plannedRunway) ||
+    tlr.runways[0]
+  );
+}
+
+/**
+ * Says out loud when the section is showing a runway the flight was not
+ * planned around.
+ *
+ * The figures themselves are SimBrief's own for that runway -- it computes a
+ * full analysis for every runway it evaluates, so nothing here is derived or
+ * estimated. What changing the view does *not* do is re-plan the flight: the
+ * fuel, the route and the takeoff weight still belong to the planned runway,
+ * and this line exists so that is never quietly forgotten.
+ */
+function runwaySwitchNote(tlr, runway, role) {
+  if (!runway || !tlr?.plannedRunway || runway.identifier === tlr.plannedRunway) return '';
+
+  return `<div class="rwy-switch">
+    <span class="k">${escapeHtml(t('perf.briefingRwy'))} <b class="ltr">${escapeHtml(runway.identifier)}</b></span>
+    <span class="note">${escapeHtml(t('perf.notPlannedRwy'))} <span class="ltr">${escapeHtml(tlr.plannedRunway)}</span></span>
+    <button class="rwy-reset" data-action="pick-runway" data-role="${escapeHtml(role)}" data-runway="">
+      ${escapeHtml(t('perf.backToPlanned'))}
+    </button>
+  </div>`;
 }
 
 /**
@@ -78,23 +117,19 @@ function takeoffSection(model, tlr, runway, live) {
       tlr.runways.map((r) => r.identifier),
       tlr.plannedRunway
     )}
+    ${runwaySwitchNote(tlr, runway, 'takeoff')}
     ${subHead(`${t('to.perfFor')} — ${runway?.identifier || ''}`)}
     ${takeoffBody(model, tlr, runway)}
     ${subHead(t('to.conditions'))}
     ${conditionsBody(tlr, runway, live)}
     ${subHead(t('to.config'))}
     ${configBody(model, tlr, runway)}
-    ${subHead(`${t('to.otherRunways')} (${Math.max(0, tlr.runways.length - 1)})`)}
-    ${runwayTable(tlr)}
+    ${subHead(`${t('to.pickRunway')} (${tlr.runways.length})`)}
+    ${runwayTable(tlr, { role: 'takeoff', active: runway?.identifier })}
   `;
 }
 
-/** The runway the landing figures were computed for. */
-function landingRunway(tlr) {
-  return tlr?.runways.find((r) => r.identifier === tlr.plannedRunway) || tlr?.runways[0] || null;
-}
-
-function landingSection(model, tlr, live) {
+function landingSection(model, tlr, runway, live) {
   return `
     ${airportHead(
       model.destination,
@@ -102,12 +137,13 @@ function landingSection(model, tlr, live) {
       tlr?.runways?.map((r) => r.identifier),
       tlr?.plannedRunway
     )}
+    ${runwaySwitchNote(tlr, runway, 'landing')}
     ${subHead(t('arr.landingPerf'))}
-    ${landingPerformanceBody(model, live)}
+    ${landingPerformanceBody(model, live, runway)}
     ${
       tlr
-        ? `${subHead(`${t('to.otherRunways')} (${Math.max(0, tlr.runways.length - 1)})`)}
-           ${runwayTable(tlr, { landing: true })}`
+        ? `${subHead(`${t('to.pickRunway')} (${tlr.runways.length})`)}
+           ${runwayTable(tlr, { landing: true, role: 'landing', active: runway?.identifier })}`
         : ''
     }
   `;

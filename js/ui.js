@@ -551,11 +551,13 @@ function stamp(value) {
  * the arrival chapter (full detail) and the descent chapter (reviewed ahead
  * of top of descent, before workload picks up).
  */
-export function landingPerformanceBody(model, live = null) {
+export function landingPerformanceBody(model, live = null, picked = null) {
   const tlr = model.tlr.landing;
   if (!tlr) return `<div class="empty-state">${escapeHtml(t('common.notAvailable'))}</div>`;
 
-  const runway = tlr.runways.find((r) => r.identifier === tlr.plannedRunway) || tlr.runways[0];
+  // The caller may be briefing a runway other than the planned one; it passes
+  // that in rather than having this resolve the planned one all over again.
+  const runway = picked || tlr.runways.find((r) => r.identifier === tlr.plannedRunway) || tlr.runways[0];
   if (!runway) return `<div class="empty-state">${escapeHtml(t('common.notAvailable'))}</div>`;
 
   const maxWeight = runway.maxWeightDry ?? model.weights.maxLdw;
@@ -782,7 +784,15 @@ export function runwayBar(runway, { showStop = true } = {}) {
 }
 
 /** Comparison table across every runway SimBrief evaluated. */
-export function runwayTable(tlr, { landing = false } = {}) {
+/**
+ * Every runway SimBrief evaluated, as a table.
+ *
+ * Given a `role` the rows become the control for switching which runway the
+ * section above is briefing. That is the whole point of SimBrief computing
+ * all of them: a runway change on the ground is a normal event, and the
+ * numbers for the new one are already here rather than something to derive.
+ */
+export function runwayTable(tlr, { landing = false, role = null, active = null } = {}) {
   if (!tlr?.runways?.length) return '';
   const headers = landing
     ? [t('common.runway'), 'LDA', t('to.headwind'), t('to.crosswind'), t('arr.maxDry'), t('arr.gradient'), 'ILS']
@@ -791,6 +801,7 @@ export function runwayTable(tlr, { landing = false } = {}) {
   const rows = tlr.runways
     .map((r) => {
       const planned = r.identifier === tlr.plannedRunway;
+      const showing = role && r.identifier === active;
       const cells = landing
         ? [
             r.identifier,
@@ -811,7 +822,19 @@ export function runwayTable(tlr, { landing = false } = {}) {
             r.maxWeight ? fmtNumber(r.maxWeight) : '—',
             r.limitCode || '—'
           ];
-      return `<tr class="${planned ? 'planned' : ''}">${cells.map((c) => `<td>${c}</td>`).join('')}</tr>`;
+
+      const cls = [planned ? 'planned' : '', showing ? 'showing' : '', role ? 'pickable' : '']
+        .filter(Boolean)
+        .join(' ');
+
+      // Rows carry the action rather than a button in a cell: the whole row
+      // is the target, which is the only size worth aiming at on a tablet.
+      const attrs = role
+        ? ` data-action="pick-runway" data-role="${escapeHtml(role)}" data-runway="${escapeHtml(r.identifier)}"
+            role="button" tabindex="0" aria-pressed="${showing}"`
+        : '';
+
+      return `<tr class="${cls}"${attrs}>${cells.map((c) => `<td>${c}</td>`).join('')}</tr>`;
     })
     .join('');
 

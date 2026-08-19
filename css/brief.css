@@ -3278,6 +3278,83 @@ table.rw-table tr.planned td:first-child {
   color: var(--amber);
 }
 
+/*
+ * A pickable row is the control for re-briefing that runway. The row being
+ * shown reads in the live colour, so it never competes with the amber the
+ * *planned* runway keeps -- the two are different facts and a crew has to be
+ * able to see both at once.
+ */
+table.rw-table tr.pickable {
+  cursor: pointer;
+}
+
+table.rw-table tr.pickable:active td {
+  background: var(--panel-3);
+}
+
+table.rw-table tr.showing td {
+  background: var(--blue-bg);
+  box-shadow: inset 2px 0 0 var(--blue);
+}
+
+table.rw-table tr.showing td:first-child {
+  color: var(--blue);
+}
+
+table.rw-table tr.pickable:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: -2px;
+}
+
+/* ------------------------------------------------------- runway re-brief */
+
+/*
+ * Shown only while a section is briefing something other than the planned
+ * runway. Deliberately loud: every figure under it is real, but the flight
+ * around it was still planned for a different runway.
+ */
+.rwy-switch {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin: 0 15px 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--blue);
+  border-radius: var(--radius-sm);
+  background: var(--blue-bg);
+}
+
+.rwy-switch .k {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--blue);
+}
+
+.rwy-switch .k b {
+  font-family: var(--mono);
+  font-size: 14px;
+}
+
+.rwy-switch .note {
+  font-size: 10.5px;
+  color: var(--dim);
+}
+
+.rwy-switch .rwy-reset {
+  margin-inline-start: auto;
+  padding: 5px 11px;
+  border: 1px solid var(--line-solid);
+  border-radius: 999px;
+  background: var(--panel-2);
+  color: var(--text);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
 .table-scroll {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;

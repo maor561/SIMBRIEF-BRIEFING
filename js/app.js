@@ -85,7 +85,11 @@ const state = {
   ofpCheckedAt: 0,
   ofpUpdate: null,
   ofpDismissed: null,
-  checkingOfp: false
+  checkingOfp: false,
+  // Which runway the Performance chapter is briefing, when it is not the
+  // planned one. Held here rather than in the view because a chapter switch
+  // rebuilds the view entirely, and a runway change survives that.
+  runwayPick: { takeoff: null, landing: null }
 };
 
 const el = {
@@ -140,6 +144,9 @@ async function load({ username, demo = false } = {}) {
     state.chapter = 'overview';
     state.vatsim = null;
     state.liveMetar = null;
+    // A new plan brings its own planned runways; carrying the old pick over
+    // would brief a runway this OFP never chose.
+    state.runwayPick = { takeoff: null, landing: null };
 
     // Whatever this load just fetched is by definition the newest copy, so
     // any pending "new OFP" notice from before is stale news now.
@@ -275,7 +282,8 @@ function renderChapter({ preserveScroll = false } = {}) {
     findings: state.findings,
     vatsim: state.vatsim,
     liveMetar: state.liveMetar,
-    timeline: state.timeline
+    timeline: state.timeline,
+    runwayPick: state.runwayPick
   });
   if (chapter.id === 'atc') ensureVatsim();
   // Performance wants it too: the live wind is what its takeoff figures get
@@ -524,17 +532,31 @@ el.form.addEventListener('submit', (event) => {
 
 el.demo.addEventListener('click', () => load({ demo: true }));
 
-// The tokens carry `role="button" tabindex="0"` precisely so this works: a
-// keyboard-only reader tabbing through a METAR/TAF/NOTAM body can reach one
-// and open it the way any other button opens, without a mouse or a touch.
+/*
+ * Enter and Space on anything that is a button by role but not by tag.
+ *
+ * Glossary tokens and runway rows both carry `role="button" tabindex="0"`
+ * precisely so this works: a keyboard-only reader can reach one and activate
+ * it the way any other button activates. A real <button> is left alone --
+ * the browser already turns those keys into a click, and handling them here
+ * too would fire the action twice.
+ */
 document.addEventListener('keydown', (event) => {
   if (event.key !== 'Enter' && event.key !== ' ') return;
-  const token = event.target.closest('[data-gloss]');
-  if (!token) return;
 
-  // Space would otherwise scroll the page under a focused, non-form element.
+  const token = event.target.closest('[data-gloss]');
+  if (token) {
+    // Space would otherwise scroll the page under a focused, non-form element.
+    event.preventDefault();
+    toggleGlossary(token);
+    return;
+  }
+
+  const target = event.target.closest('[data-action][role="button"]');
+  if (!target || target.tagName === 'BUTTON') return;
+
   event.preventDefault();
-  toggleGlossary(token);
+  target.click();
 });
 
 document.addEventListener('click', (event) => {
@@ -710,6 +732,16 @@ document.addEventListener('click', (event) => {
       node.hidden = true;
       node.innerHTML = '';
       delete node.dataset.key;
+      break;
+    }
+
+    // An empty data-runway is the reset control on the switch banner, which
+    // clears the pick and falls the section back to the planned runway.
+    case 'pick-runway': {
+      const { role, runway } = trigger.dataset;
+      if (role !== 'takeoff' && role !== 'landing') break;
+      state.runwayPick = { ...state.runwayPick, [role]: runway || null };
+      renderChapter({ preserveScroll: true });
       break;
     }
 
