@@ -645,6 +645,341 @@ table.navlog-table th { padding: 6px 8px; }
   .wx-stats { gap: 12px; width: 100%; justify-content: space-between; }
 }
 
+/* ---------------------------------------------------- graphic wx decode */
+
+.wxrow-head .grow { flex: 1; }
+
+/* Chevron toggle: rotates open, same icon-button footprint as the refresh
+   and NOTAM controls so it reads as part of the same family. */
+.wx-decode-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--dim);
+  cursor: pointer;
+}
+
+.wx-decode-btn:hover { background: var(--panel-3); color: var(--text); }
+
+.wx-decode-btn .icon {
+  transition: transform 0.15s ease;
+}
+
+.wx-decode-btn[aria-expanded='true'] .icon { transform: rotate(180deg); }
+
+/* Collapsed by default -- the raw string is the thing a crew trusts; the
+   graphic is a click away, not a wall it has to scroll past. */
+.wx-decode { display: none; }
+.wxrow.decode-open .wx-decode {
+  display: block;
+  margin-block-start: 11px;
+  padding-block-start: 11px;
+  border-block-start: 1px solid var(--line-solid);
+}
+
+.wxd-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(112px, 1fr));
+  gap: 8px;
+}
+
+.wxd-tile {
+  background: var(--panel-2);
+  border-radius: var(--radius-sm);
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  text-align: center;
+}
+
+.wxd-label {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--dimmer);
+  margin-block-end: 2px;
+}
+
+.wxd-tile b {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.wxd-gust {
+  font-style: normal;
+  color: var(--amber);
+  margin-inline-start: 2px;
+}
+
+.wxd-sub {
+  font-size: 10.5px;
+  color: var(--dim);
+  line-height: 1.4;
+}
+
+.wxd-empty {
+  font-size: 13px;
+  color: var(--dimmer);
+}
+
+.wxd-tile-foot { margin-block-start: 2px; }
+
+/* Visibility bar: red-to-green scale up to 10 km, filled to the reported value. */
+.wxd-meter {
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: linear-gradient(90deg, var(--red) 0 16%, var(--amber) 16% 50%, var(--green) 50%);
+  opacity: 0.35;
+  position: relative;
+  margin-block-end: 2px;
+  overflow: hidden;
+}
+
+.wxd-meter-fill {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  background: var(--text);
+  mix-blend-mode: overlay;
+}
+
+/* Cloud profile: one bar per layer, height proportional to its base. */
+.wxd-cloud-profile {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  height: 40px;
+  width: 100%;
+  justify-content: center;
+}
+
+.wxd-cloud-bar {
+  width: 16px;
+  min-height: 6px;
+  border-radius: 3px 3px 0 0;
+  background: var(--dim);
+  position: relative;
+}
+
+.wxd-cloud-bar.warn { background: var(--amber); }
+.wxd-cloud-bar.bad { background: var(--red); }
+
+.wxd-cloud-bar span {
+  position: absolute;
+  bottom: 100%;
+  inset-inline-start: 50%;
+  transform: translateX(-50%);
+  font-size: 8px;
+  color: var(--dimmer);
+  white-space: nowrap;
+}
+
+.wxd-hazards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-block-start: 10px;
+}
+
+/* ------------------------------------------------------------ TAF timeline */
+
+.wxd-taf-axis {
+  display: grid;
+  grid-template-columns: 46px 1fr;
+  align-items: stretch;
+  row-gap: 3px;
+  position: relative;
+}
+
+.wxd-taf-lane-label {
+  grid-column: 1;
+  display: flex;
+  align-items: center;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--dimmer);
+}
+
+.wxd-taf-row {
+  grid-column: 2;
+  position: relative;
+  min-height: 24px;
+}
+
+.wxd-taf-overlay {
+  grid-column: 2;
+  grid-row: 1 / -1;
+  position: relative;
+  pointer-events: none;
+}
+
+.wxd-taf-band {
+  position: absolute;
+  top: 1px;
+  bottom: 1px;
+  border-radius: 5px;
+  display: flex;
+  align-items: center;
+  padding-inline: 6px;
+  font-size: 9.5px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  direction: ltr;
+}
+
+.wxd-taf-band.base { background: var(--blue-bg); color: var(--blue); }
+.wxd-taf-band.becmg { background: rgba(169, 136, 255, 0.18); color: var(--violet); }
+.wxd-taf-band.tempo { background: var(--amber-bg); color: var(--amber); }
+.wxd-taf-band.prob { background: var(--amber-bg); color: var(--amber); border: 1px dashed var(--amber); }
+.wxd-taf-band.hazard { background: var(--red); color: #fff; }
+
+.wxd-taf-eta {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  width: 2px;
+  background: var(--text);
+  transform: translateX(-50%);
+}
+
+.wxd-taf-eta i {
+  position: absolute;
+  top: -13px;
+  inset-inline-start: 50%;
+  transform: translateX(-50%);
+  font-style: normal;
+  font-size: 8.5px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: var(--text);
+  color: var(--bg);
+  white-space: nowrap;
+}
+
+.wxd-taf-legend {
+  margin-block-start: 11px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.wxd-taf-legend-row {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  font-size: 11px;
+  color: var(--dim);
+}
+
+.wxd-taf-legend-row b {
+  font-size: 10px;
+  color: var(--text);
+  min-width: 62px;
+  flex: none;
+}
+
+.wxd-taf-legend-row > span:first-of-type {
+  color: var(--dimmer);
+  flex: none;
+}
+
+/* -------------------------------------------------------------- SIGMET */
+
+.wxd-sigmet {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.wxd-sigmet-info {
+  flex: 1;
+  min-width: 160px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.wxd-sigmet-info .wxd-tile {
+  align-items: flex-start;
+  text-align: start;
+  max-width: 160px;
+}
+
+.wxd-sigmet-alt {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+}
+
+.wxd-sigmet-alt-track {
+  position: relative;
+  width: 34px;
+  height: 110px;
+  background: var(--panel-2);
+  border-radius: var(--radius-sm);
+  overflow: visible;
+}
+
+.wxd-sigmet-alt-band {
+  position: absolute;
+  inset-inline: 3px;
+  border-radius: 4px;
+  background: var(--red-bg);
+  border: 1px solid var(--red);
+}
+
+.wxd-sigmet-cruise {
+  position: absolute;
+  inset-inline: -2px;
+  border-block-start: 2px solid var(--blue);
+}
+
+.wxd-sigmet-cruise i {
+  position: absolute;
+  inset-inline-start: calc(100% + 6px);
+  top: -7px;
+  font-style: normal;
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--blue);
+  white-space: nowrap;
+}
+
+/* Top/base labels sit outside the track itself, anchored to its own top and
+   bottom edge -- correct whatever height the track ends up at, no figure
+   here assumes the other's size. */
+.wxd-sigmet-alt-top,
+.wxd-sigmet-alt-base {
+  position: absolute;
+  inset-inline-start: calc(100% + 6px);
+  font-size: 9px;
+  color: var(--dimmer);
+  white-space: nowrap;
+}
+
+.wxd-sigmet-alt-top { top: -5px; }
+.wxd-sigmet-alt-base { bottom: -5px; }
+
+@media (max-width: 640px) {
+  .wxd-grid { grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); }
+  .wxd-sigmet { flex-direction: column; }
+}
+
 /* A labelled divider inside a section, when one panel holds several blocks. */
 .sub-head {
   padding: 10px 15px;

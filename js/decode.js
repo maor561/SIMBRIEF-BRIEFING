@@ -190,6 +190,120 @@ function phrase(entry) {
  * Parses the body of a METAR. Returns structured fields plus `unparsed` for
  * tokens we chose not to interpret.
  */
+/**
+ * Matches the token groups a METAR body and a TAF group's body have in
+ * common -- wind, visibility, cloud, temperature/dewpoint, pressure, present
+ * weather -- against `out`. Returns whether the token was recognised, so a
+ * caller with its own extra vocabulary (a METAR's station/time header, a
+ * TAF's change indicators) can fall through to that when this returns false.
+ */
+function matchWxBodyToken(token, out) {
+  // Wind: 24014KT, 24014G26KT, VRB03KT, 00000KT
+  let m = token.match(/^(\d{3}|VRB)(\d{2,3})(?:G(\d{2,3}))?(KT|MPS|KMH)$/);
+  if (m) {
+    const speedRaw = +m[2];
+    const gustRaw = m[3] ? +m[3] : null;
+    const toKt = m[4] === 'MPS' ? 1.94384 : m[4] === 'KMH' ? 0.539957 : 1;
+    out.wind = {
+      direction: m[1] === 'VRB' ? null : +m[1],
+      variable: m[1] === 'VRB',
+      speed: Math.round(speedRaw * toKt),
+      gust: gustRaw === null ? null : Math.round(gustRaw * toKt),
+      calm: speedRaw === 0,
+      varyFrom: null,
+      varyTo: null
+    };
+    return true;
+  }
+  // Wind direction range: 330V070
+  m = token.match(/^(\d{3})V(\d{3})$/);
+  if (m && out.wind) {
+    out.wind.varyFrom = +m[1];
+    out.wind.varyTo = +m[2];
+    return true;
+  }
+  if (token === 'CAVOK') {
+    out.cavok = true;
+    return true;
+  }
+  // Visibility in metres: 9999, 0800
+  if (/^\d{4}$/.test(token)) {
+    out.visibility = { metres: +token, unlimited: token === '9999' };
+    return true;
+  }
+  // Visibility in statute miles: 10SM, 1/2SM, M1/4SM
+  m = token.match(/^(M)?(\d+)(?:\/(\d+))?SM$/);
+  if (m) {
+    const value = m[3] ? +m[2] / +m[3] : +m[2];
+    out.visibility = { statuteMiles: value, below: Boolean(m[1]), metres: Math.round(value * 1609) };
+    return true;
+  }
+  // Clouds: FEW020, BKN014CB, VV003
+  m = token.match(/^(FEW|SCT|BKN|OVC|VV)(\d{3})(CB|TCU)?$/);
+  if (m) {
+    out.clouds.push({
+      amount: m[1],
+      amountText: phrase(CLOUD_AMOUNT[m[1]]),
+      oktas: CLOUD_AMOUNT[m[1]]?.oktas ?? null,
+      baseFt: +m[2] * 100,
+      convective: m[3] || null
+    });
+    return true;
+  }
+  if (['SKC', 'CLR', 'NSC', 'NCD'].includes(token)) {
+    out.clouds.push({ amount: token, amountText: phrase(CLOUD_AMOUNT[token]), oktas: 0, baseFt: null });
+    return true;
+  }
+  // Temperature / dewpoint: 15/11, M02/M05
+  m = token.match(/^(M?\d{1,2})\/(M?\d{1,2})$/);
+  if (m) {
+    const conv = (v) => (v.startsWith('M') ? -+v.slice(1) : +v);
+    out.temperature = conv(m[1]);
+    out.dewpoint = conv(m[2]);
+    return true;
+  }
+  // Pressure
+  m = token.match(/^Q(\d{4})$/);
+  if (m) {
+    out.qnhHpa = +m[1];
+    out.qnhInHg = Math.round((+m[1] / 33.8639) * 100) / 100;
+    return true;
+  }
+  m = token.match(/^A(\d{4})$/);
+  if (m) {
+    out.qnhInHg = +m[1] / 100;
+    out.qnhHpa = Math.round((+m[1] / 100) * 33.8639);
+    return true;
+  }
+  // Present weather: -RA, +TSRA, VCSH, FZFG
+  m = token.match(/^([-+]|VC)?((?:MI|BC|DR|BL|SH|TS|FZ|RA|SN|DZ|GR|GS|PL|FG|BR|HZ|FU|DU|SA|SQ){1,3})$/);
+  if (m) {
+    const codes = m[2].match(/.{2}/g) || [];
+    out.weather.push({
+      intensity: m[1] === '-' ? 'light' : m[1] === '+' ? 'heavy' : m[1] === 'VC' ? 'vicinity' : 'moderate',
+      codes,
+      text: codes.map((c) => phrase(WX_PHENOMENA[c])).filter(Boolean).join(' ')
+    });
+    return true;
+  }
+  return false;
+}
+
+/** Fresh, empty holder for the fields `matchWxBodyToken` fills in. */
+function emptyWxBody() {
+  return {
+    wind: null,
+    visibility: null,
+    cavok: false,
+    clouds: [],
+    weather: [],
+    temperature: null,
+    dewpoint: null,
+    qnhHpa: null,
+    qnhInHg: null
+  };
+}
+
 export function parseMetar(rawText) {
   if (!rawText) return null;
   const raw = rawText.trim().replace(/\s+/g, ' ');
@@ -199,17 +313,9 @@ export function parseMetar(rawText) {
     raw,
     station: null,
     issued: null,
-    wind: null,
-    visibility: null,
-    cavok: false,
-    clouds: [],
-    weather: [],
-    temperature: null,
-    dewpoint: null,
-    qnhHpa: null,
-    qnhInHg: null,
     trend: null,
-    unparsed: []
+    unparsed: [],
+    ...emptyWxBody()
   };
 
   tokens.forEach((token, index) => {
@@ -223,100 +329,39 @@ export function parseMetar(rawText) {
     }
     if (token === 'AUTO' || token === 'COR' || token === 'METAR' || token === 'SPECI') return;
 
-    // Wind: 24014KT, 24014G26KT, VRB03KT, 00000KT
-    let m = token.match(/^(\d{3}|VRB)(\d{2,3})(?:G(\d{2,3}))?(KT|MPS|KMH)$/);
-    if (m) {
-      const speedRaw = +m[2];
-      const gustRaw = m[3] ? +m[3] : null;
-      const toKt = m[4] === 'MPS' ? 1.94384 : m[4] === 'KMH' ? 0.539957 : 1;
-      out.wind = {
-        direction: m[1] === 'VRB' ? null : +m[1],
-        variable: m[1] === 'VRB',
-        speed: Math.round(speedRaw * toKt),
-        gust: gustRaw === null ? null : Math.round(gustRaw * toKt),
-        calm: speedRaw === 0,
-        varyFrom: null,
-        varyTo: null
-      };
-      return;
-    }
-    // Wind direction range: 330V070
-    m = token.match(/^(\d{3})V(\d{3})$/);
-    if (m && out.wind) {
-      out.wind.varyFrom = +m[1];
-      out.wind.varyTo = +m[2];
-      return;
-    }
-    if (token === 'CAVOK') {
-      out.cavok = true;
-      return;
-    }
-    // Visibility in metres: 9999, 0800
-    if (/^\d{4}$/.test(token)) {
-      out.visibility = { metres: +token, unlimited: token === '9999' };
-      return;
-    }
-    // Visibility in statute miles: 10SM, 1/2SM, M1/4SM
-    m = token.match(/^(M)?(\d+)(?:\/(\d+))?SM$/);
-    if (m) {
-      const value = m[3] ? +m[2] / +m[3] : +m[2];
-      out.visibility = { statuteMiles: value, below: Boolean(m[1]), metres: Math.round(value * 1609) };
-      return;
-    }
-    // Clouds: FEW020, BKN014CB, VV003
-    m = token.match(/^(FEW|SCT|BKN|OVC|VV)(\d{3})(CB|TCU)?$/);
-    if (m) {
-      out.clouds.push({
-        amount: m[1],
-        amountText: phrase(CLOUD_AMOUNT[m[1]]),
-        oktas: CLOUD_AMOUNT[m[1]]?.oktas ?? null,
-        baseFt: +m[2] * 100,
-        convective: m[3] || null
-      });
-      return;
-    }
-    if (['SKC', 'CLR', 'NSC', 'NCD'].includes(token)) {
-      out.clouds.push({ amount: token, amountText: phrase(CLOUD_AMOUNT[token]), oktas: 0, baseFt: null });
-      return;
-    }
-    // Temperature / dewpoint: 15/11, M02/M05
-    m = token.match(/^(M?\d{1,2})\/(M?\d{1,2})$/);
-    if (m) {
-      const conv = (v) => (v.startsWith('M') ? -+v.slice(1) : +v);
-      out.temperature = conv(m[1]);
-      out.dewpoint = conv(m[2]);
-      return;
-    }
-    // Pressure
-    m = token.match(/^Q(\d{4})$/);
-    if (m) {
-      out.qnhHpa = +m[1];
-      out.qnhInHg = Math.round((+m[1] / 33.8639) * 100) / 100;
-      return;
-    }
-    m = token.match(/^A(\d{4})$/);
-    if (m) {
-      out.qnhInHg = +m[1] / 100;
-      out.qnhHpa = Math.round((+m[1] / 100) * 33.8639);
-      return;
-    }
+    if (matchWxBodyToken(token, out)) return;
+
     if (['NOSIG', 'BECMG', 'TEMPO'].includes(token)) {
       out.trend = token;
       return;
     }
-    // Present weather: -RA, +TSRA, VCSH, FZFG
-    m = token.match(/^([-+]|VC)?((?:MI|BC|DR|BL|SH|TS|FZ|RA|SN|DZ|GR|GS|PL|FG|BR|HZ|FU|DU|SA|SQ){1,3})$/);
-    if (m) {
-      const codes = m[2].match(/.{2}/g) || [];
-      out.weather.push({
-        intensity: m[1] === '-' ? 'light' : m[1] === '+' ? 'heavy' : m[1] === 'VC' ? 'vicinity' : 'moderate',
-        codes,
-        text: codes.map((c) => phrase(WX_PHENOMENA[c])).filter(Boolean).join(' ')
-      });
-      return;
-    }
 
     if (token && !/^(RMK|R\d{2}|NOSIG)/.test(token)) out.unparsed.push(token);
+  });
+
+  return out;
+}
+
+/**
+ * Parses a single TAF group's own text (a base period, or a BECMG / TEMPO /
+ * INTER / PROBnn / FMhhmmss change group) for the same fields a METAR body
+ * carries, so a group can be shown graphically rather than as plain text.
+ *
+ * The group's own change indicator, probability and time tokens are
+ * structural rather than weather, so they are skipped here -- `parseTaf`
+ * already extracted them into `kind`/`probability`/`from`/`to`.
+ */
+export function parseTafGroupBody(text) {
+  if (!text) return null;
+  const tokens = text.trim().replace(/\s+/g, ' ').split(' ');
+  const out = emptyWxBody();
+
+  tokens.forEach((token) => {
+    if (/^(BECMG|TEMPO|INTER)$/.test(token)) return;
+    if (/^PROB\d{2}$/.test(token)) return;
+    if (/^FM\d{6}$/.test(token)) return;
+    if (/^\d{4}\/\d{4}$/.test(token)) return;
+    matchWxBodyToken(token, out);
   });
 
   return out;
@@ -434,6 +479,116 @@ export function groupCovers(group, time) {
   if (!group?.from || !(time instanceof Date)) return false;
   const end = group.to || new Date(group.from.getTime() + 6 * 3600 * 1000);
   return time >= group.from && time <= end;
+}
+
+/* ------------------------------------------------------------------ SIGMET */
+
+/**
+ * The phenomenon a SIGMET is warning about, tried most-specific first so a
+ * qualified form (embedded, severe, heavy) is not shadowed by its bare code.
+ * Unmatched text returns a null hazard rather than a guessed one -- a
+ * SIGMET's own words already say what it is; this only picks a short label
+ * for the graphic, and there are ICAO phenomena this list does not cover.
+ */
+const SIGMET_HAZARDS = [
+  { re: /\bOBSC\s+TS\b/, label: 'Obscured thunderstorms' },
+  { re: /\bEMBD\s+TS\b/, label: 'Embedded thunderstorms' },
+  { re: /\bFRQ\s+TS\b/, label: 'Frequent thunderstorms' },
+  { re: /\bSQL\s+TS\b/, label: 'Squall line thunderstorms' },
+  { re: /\bTSGR\b/, label: 'Thunderstorms with hail' },
+  { re: /\bTS\b/, label: 'Thunderstorms' },
+  { re: /\bSEV\s+TURB\b/, label: 'Severe turbulence' },
+  { re: /\bSEV\s+ICE\s*\(FZRA\)/, label: 'Severe icing (freezing rain)' },
+  { re: /\bSEV\s+ICE\b/, label: 'Severe icing' },
+  { re: /\bSEV\s+MTW\b/, label: 'Severe mountain wave' },
+  { re: /\bHVY\s+DS\b/, label: 'Heavy duststorm' },
+  { re: /\bHVY\s+SS\b/, label: 'Heavy sandstorm' },
+  { re: /\bVA\s+CLD\b/, label: 'Volcanic ash cloud' },
+  { re: /\bVA\s+ERUPTION\b/, label: 'Volcanic eruption' },
+  { re: /\bTC\b/, label: 'Tropical cyclone' }
+];
+
+const SIGMET_DIRECTION = {
+  N: 'north', S: 'south', E: 'east', W: 'west',
+  NE: 'northeast', NW: 'northwest', SE: 'southeast', SW: 'southwest'
+};
+
+/**
+ * Resolves a SIGMET's `VALID DDHHmm/DDHHmm` window, movement, trend and the
+ * vertical extent of the phenomenon into structured fields for the graphic
+ * card, alongside the raw text the card still shows underneath. Every field
+ * a pattern does not confidently match stays `null` -- see the module note
+ * on why a wrong decode is worse than none.
+ */
+export function parseSigmet(rawText, reference) {
+  if (!rawText) return null;
+  const raw = rawText.trim().replace(/\s+/g, ' ');
+  const anchor = reference instanceof Date && !Number.isNaN(reference.getTime()) ? reference : new Date();
+
+  const hazardMatch = SIGMET_HAZARDS.find((h) => h.re.test(raw));
+
+  let validFrom = null;
+  let validTo = null;
+  const valid = raw.match(/\bVALID\s+(\d{2})(\d{2})(\d{2})\/(\d{2})(\d{2})(\d{2})\b/);
+  if (valid) {
+    validFrom = dayHourToDate(+valid[1], +valid[2], anchor, +valid[3]);
+    validTo = dayHourToDate(+valid[4], +valid[5], anchor, +valid[6]);
+  }
+
+  let movement = null;
+  if (/\bSTNR\b/.test(raw)) {
+    movement = { stationary: true, direction: null, directionText: null, speed: null };
+  } else {
+    const mov = raw.match(/\bMOV\s+([NSEW]{1,2})\s+(\d{1,3})\s*KT\b/);
+    if (mov) {
+      movement = {
+        stationary: false,
+        direction: mov[1],
+        directionText: SIGMET_DIRECTION[mov[1]] || null,
+        speed: +mov[2]
+      };
+    }
+  }
+
+  const trend = /\bINTSF\b/.test(raw)
+    ? 'intensifying'
+    : /\bWKN\b/.test(raw)
+    ? 'weakening'
+    : /\bNC\b/.test(raw)
+    ? 'no change'
+    : null;
+
+  // Vertical extent: an explicit base/top range wins; failing that a bare
+  // "TOP FLnnn" gives a top with no stated base, and "TOP ABV FLnnn" an
+  // open-ended one.
+  let base = null;
+  let top = null;
+  let topAbove = false;
+  let m = raw.match(/\bSFC\/FL(\d{3})\b/);
+  if (m) {
+    base = 0;
+    top = +m[1] * 100;
+  } else if ((m = raw.match(/\bFL(\d{3})\/FL(\d{3})\b/))) {
+    base = +m[1] * 100;
+    top = +m[2] * 100;
+  } else if ((m = raw.match(/\bTOP\s+ABV\s+FL(\d{3})\b/))) {
+    top = +m[1] * 100;
+    topAbove = true;
+  } else if ((m = raw.match(/\bTOP\s+FL(\d{3})\b/))) {
+    top = +m[1] * 100;
+  }
+
+  return {
+    raw,
+    hazard: hazardMatch?.label || null,
+    validFrom,
+    validTo,
+    movement,
+    trend,
+    base,
+    top,
+    topAbove
+  };
 }
 
 /* ------------------------------------------------------------------- NOTAMs */

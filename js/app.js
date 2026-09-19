@@ -657,6 +657,19 @@ document.addEventListener('click', (event) => {
       trigger.closest('.notam')?.classList.toggle('expanded');
       break;
 
+    // A pure DOM toggle -- the graphic decode is already in the markup,
+    // just hidden, so opening it never re-renders the chapter or moves
+    // the scroll position the way a state-driven toggle would.
+    case 'wx-decode-toggle': {
+      const row = trigger.closest('.wxrow');
+      if (!row) break;
+      const open = row.classList.toggle('decode-open');
+      trigger.setAttribute('aria-expanded', String(open));
+      trigger.title = open ? t('wx.decodeHide') : t('wx.decodeShow');
+      trigger.setAttribute('aria-label', trigger.title);
+      break;
+    }
+
     // Reading through an airport's NOTAMs and saying so is what makes the
     // next pass useful -- whatever is still flagged is what arrived since.
     case 'notams-read':
